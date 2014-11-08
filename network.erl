@@ -1,5 +1,4 @@
--module (neuron).
+-module (network).
 -export ([function/arity]).
-
 
 
