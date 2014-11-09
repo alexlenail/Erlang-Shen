@@ -6,7 +6,19 @@
 % LayerBefore and LayerAfter are PID lists. 
 init(LayerBefore, LayerAfter) -> 
 	random initialization of Theta
+
+	linear combination = fun(Activations) -> linear comb(Activations, Theta)
+
+buildCurry(Len, Sofar) when Len =:= 0 -> Sofar;
+buildCurry(Len, Sofar) when Len > 0 -> fun(X) -> Sofar([X|]) end;
+
+	buildCurry(length(LayerBefore), linear combination. )
+
+	fun(A) -> fun(B) -> fun(C) -> fun(D) -> fun([Activations]) -> linear comb(Activations, Theta)
+
+
 	loop(LayerBefore, LayerAfter, Theta).
+
 
 loop(LayerBefore, LayerAfter, Theta) -> 
 
@@ -20,11 +32,18 @@ loop(LayerBefore, LayerAfter, Theta) ->
 % Theta a list of [weights] k dimensional where k is the dimension of the layer before
 forward(Activation, Theta) when is last activation ->
 
+	buildCurry(Activation)
+
+
 	LayerAfter ! {self(), TrainingExampleID, g(linear combination of Theta and Values)}
 
 
 
 g(Z) -> 1/(1+math:exp(-Z))
+
+
+fun(A) -> fun(B) -> fun(C) -> fun(D) -> LayerAfter ! {self(), TrainingExampleID, g(linear combination of Theta and [A, B, C, D])}
+
 
 
 === 
