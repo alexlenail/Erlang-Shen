@@ -1,13 +1,14 @@
 -module (neuron).
-% -import (math, [exp/1]).
--import (lists, [member/2]).
 -export ([init/2]).
 
+
 % LayerBefore and LayerAfter are PID lists. 
-init(LayerBefore, LayerAfter) ->
-	% receive next layer pids
+start(LayerBefore) ->
 	% random initialization of Theta
-	loop(LayerBefore, LayerAfter, Theta, maps:new(), maps:new()).
+	% receive next layer pids
+	receive
+		{Pid, LayerAfter} -> loop(LayerBefore, LayerAfter, Thetas, maps:new(), maps:new())
+	end.
 
 
 loop(LayerBefore, LayerAfter, Thetas, ActivationMap, DeltaMap) -> 
