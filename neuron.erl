@@ -4,45 +4,41 @@
 -export ([init/2]).
 
 % LayerBefore and LayerAfter are PID lists. 
-init(LayerBefore, LayerAfter) -> 
-	random initialization of Theta
-
-	linear combination = fun(Activations) -> linear comb(Activations, Theta)
-
-buildCurry(Len, Sofar) when Len =:= 0 -> Sofar;
-buildCurry(Len, Sofar) when Len > 0 -> fun(X) -> Sofar([X|]) end;
-
-	buildCurry(length(LayerBefore), linear combination. )
-
-	fun(A) -> fun(B) -> fun(C) -> fun(D) -> fun([Activations]) -> linear comb(Activations, Theta)
+init(LayerBefore, LayerAfter) ->
+	% receive next layer pids
+	% random initialization of Theta
+	loop(LayerBefore, LayerAfter, Theta, maps:new(), maps:new()).
 
 
-	loop(LayerBefore, LayerAfter, Theta).
-
-
-loop(LayerBefore, LayerAfter, Theta) -> 
-
+loop(LayerBefore, LayerAfter, Thetas, ActivationMap, DeltaMap) -> 
 	receive
-		{Pid, Activation} when member(Pid, LayerBefore) -> forward(Activation, Theta);
-		{Pid, Error} when member(Pid, LayerAfter) -> backprop(Error);
-	end,
+		{Pid, Activation} when member(Pid, LayerBefore) ->
+			maps:put(Pid, Activation, ActivationMap),
+			if maps:size() =:= length(LayerBefore) ->
+				forward(ActivationMap, Thetas),
+				loop(LayerBefore, LayerAfter, Thetas, maps:new(), DeltaMap);
+			true ->
+				loop(LayerBefore, LayerAfter, Thetas, ActivationMap, DeltaMap)
+			end
+		{Pid, Delta} when member(Pid, LayerAfter) ->
+			maps:put(Pid, Delta, DeltaMap),
+			if maps:size(DeltaMap) =:= length(LayerAfter) ->
+				NewThetas = forward(DeltaMap),
+				loop(LayerBefore, LayerAfter, NewThetas, ActivationMap, maps:new());
+			true -> 
+				loop(LayerBefore, LayerAfter, Thetas, ActivationMap, DeltaMap)
+			end
+	end.
 
-	loop().
 
-% Theta a list of [weights] k dimensional where k is the dimension of the layer before
-forward(Activation, Theta) when is last activation ->
-
-	buildCurry(Activation)
-
-
-	LayerAfter ! {self(), TrainingExampleID, g(linear combination of Theta and Values)}
-
+forward(LayerBefore, LayerAfter, ActivationMap, Thetas) ->
+	Activation = g(lists:sum(lists:map(fun(Pid) -> maps:get(Pid, ActivationMap) * maps:get(Pid, ThetaMap) end, LayerBefore))),
+	lists:map(fun(Pid) -> Pid ! {self(), Activation}, LayerAfter).
 
 
 g(Z) -> 1/(1+math:exp(-Z))
 
 
-fun(A) -> fun(B) -> fun(C) -> fun(D) -> LayerAfter ! {self(), TrainingExampleID, g(linear combination of Theta and [A, B, C, D])}
 
 
 
