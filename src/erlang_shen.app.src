@@ -1,0 +1,12 @@
+{application, erlang_shen,
+ [
+  {description, ""},
+  {vsn, "1"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, {erlang_shen, []}},
+  {env, []}
+ ]}.
