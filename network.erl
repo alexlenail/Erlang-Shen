@@ -2,11 +2,26 @@
 -export ([function/arity]).
 
 
-% init (num hidden layers, num nodes per layer (or just a list of numbers of nodes if we want to vary nodes per layer))
-    % for each layer, start correct number of nodes and save pids
-        % pass previous layer pids to spawning node as param
-        % send list of pids of completed layer to previous layer
-    % potentially return a pid to our "main" that we can send data to
+
+% NetworkArchitecture is a list of Hidden Layer Dimensions. 
+init(Dataset, NetworkArchitecture) -> 
+
+	Network = [[spawn(neuron, start, []) || X <- lists:seq(Dimension)] || Dimension <- NetworkArchitecture]
+
+	lists:foldl(fun(Layer, LayerAfter) -> lists:map(fun(Neuron) -> Neuron ! LayerAfter, Layer), Layer. end, Network)
+	lists:foldr(fun(Layer, LayerBefore) -> lists:map(fun(Neuron) -> Neuron ! LayerBefore, Layer), Layer. end, Network)
+
+	% Make a first and last layer. 
+
+	% First Layer
+	% Find the dimensionality of the training data. 
+	% Send appropriate Pids. 
+
+	% Last layer
+	% Find the dimenionality of the labels. 
+	% Send the last hidden layer these Pids, and send these Pids the Layerbefore. 
+
+
 
 % learn
     % send data to input layer

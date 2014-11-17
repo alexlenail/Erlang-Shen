@@ -15,9 +15,12 @@ start(M) ->
 	Accumulator = maps:new(),
 	lists:map(fun(Pid) -> maps:put(Pid, 0, Accumulator) end, LayerAfter),
 
-	call loop
 
-	loop runs M of times
+
+
+
+
+	loop runs M times
 	returns Accumulator
 
 	use Accumulator to update ThetaMap
