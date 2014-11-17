@@ -10,3 +10,8 @@
 
 % learn
     % send data to input layer
+
+
+% bias units?
+
+

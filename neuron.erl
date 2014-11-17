@@ -3,8 +3,11 @@
 
 
 % LayerBefore and LayerAfter are PID lists. 
-start(LayerBefore) ->
-	% receive next layer pids
+start(M) ->
+
+	receive
+		{LayerBefore, LayerAfter}
+	end. 
 
 	Theta = maps:new(),
 	% random initialization of Theta
@@ -12,10 +15,24 @@ start(LayerBefore) ->
 	Accumulator = maps:new(),
 	lists:map(fun(Pid) -> maps:put(Pid, 0, Accumulator) end, LayerAfter),
 
+	call loop
 
-	receive
-		{Pid, LayerAfter} -> loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new())
-	end.
+	loop runs M of times
+	returns Accumulator
+
+	use Accumulator to update ThetaMap
+
+	do again. 
+
+	send messages to first layer. 
+	receive from last layer. 
+	send actual to last layer. 
+	make sure backprop stops for first layer. 
+
+
+
+
+	loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator)
 
 	Bigloop -> 
 		loop 
@@ -69,8 +86,6 @@ backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator) ->
 	lists:map(fun(Pid) -> Pid ! {self(), Delta}, LayerBefore), 
 
 	Accumulator.
-
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
