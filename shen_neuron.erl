@@ -1,20 +1,20 @@
--module (neuron).
--export ([init/2]).
+-module (shen_neuron).
+-export ([start/1]).
 
 
--define(INIT_EPSILON, .0001).
+-define(INIT_EPSILON, 0.0001).
 
 
 % LayerBefore and LayerAfter are PID lists. 
 start(M) ->
 
 	receive
-		{LayerBefore, LayerAfter}
-	end. 
+		{Pid, LayerBefore, LayerAfter} -> ok
+	end,
 
 	% random initialization of Thetas
 	ThetaMap = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, (random:uniform()*(2*?INIT_EPSILON))-?INIT_EPSILON, ThetaMap) end, LayerBefore),
+	lists:map(fun(Pid) -> maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, ThetaMap) end, LayerBefore),
 
 	Accumulator = maps:new(),
 	lists:map(fun(Pid) -> maps:put(Pid, 0, Accumulator) end, LayerAfter),
@@ -31,7 +31,7 @@ start(M) ->
 	% send actual to last layer. 
 	% make sure backprop stops for first layer. 
 
-	loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator)
+	loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator).
 
 	% Bigloop -> 
 	% 	loop 
@@ -41,18 +41,18 @@ start(M) ->
 
 loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator) -> 
 	receive
-		{Pid, Activation} when member(Pid, LayerBefore) ->
+		{Pid, Activation} when lists:member(Pid, LayerBefore) ->
 			maps:put(Pid, Activation, ActivationMap),
 			if maps:size() =:= length(LayerBefore) ->
 				forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap),
 				loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), DeltaMap), Accumulator;
 			true ->
 				loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator)
-			end
+			end;
 		{Pid, Delta} when member(Pid, LayerAfter) ->
 			maps:put(Pid, Delta, DeltaMap),
 			if maps:size(DeltaMap) =:= length(LayerAfter) ->
-				NewAccumulator = backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap Accumulator),
+				NewAccumulator = backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator),
 				loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, maps:new(), NewAccumulator);
 			true -> 
 				loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator)
@@ -63,11 +63,11 @@ loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator) ->
 
 forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap) ->
 	Activation = g(lists:sum(lists:map(fun(Pid) -> maps:get(Pid, ActivationMap) * maps:get(Pid, ThetaMap) end, LayerBefore))),
-	lists:map(fun(Pid) -> Pid ! {self(), Activation}, LayerAfter), 
+	lists:map(fun(Pid) -> Pid ! {self(), Activation} end, LayerAfter),
 	Activation. 
 
 
-g(Z) -> 1/(1+math:exp(-Z))
+g(Z) -> 1/(1+math:exp(-Z)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -77,12 +77,12 @@ backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator) ->
 	Delta = Activation * (1- Activation) * Error,
 
 	lists:map(fun(Pid) -> 
-		Change = Activation * maps:get(Pid, DeltaMap),
-		maps:put(Pid, maps:get(Pid, Accumulator) + Change, Accumulator),
-		end, 
+				Change = Activation * maps:get(Pid, DeltaMap),
+				maps:put(Pid, maps:get(Pid, Accumulator) + Change, Accumulator)
+			end,
 		LayerAfter),
 
-	lists:map(fun(Pid) -> Pid ! {self(), Delta}, LayerBefore), 
+	lists:map(fun(Pid) -> Pid ! {self(), Delta} end, LayerBefore), 
 
 	Accumulator.
 
