@@ -2,6 +2,9 @@
 -export ([init/2]).
 
 
+-define(INIT_EPSILON, .0001).
+
+
 % LayerBefore and LayerAfter are PID lists. 
 start(M) ->
 
@@ -9,37 +12,30 @@ start(M) ->
 		{LayerBefore, LayerAfter}
 	end. 
 
-	Theta = maps:new(),
-	% random initialization of Theta
+	% random initialization of Thetas
+	ThetaMap = maps:new(),
+	lists:map(fun(Pid) -> maps:put(Pid, (random:uniform()*(2*?INIT_EPSILON))-?INIT_EPSILON, ThetaMap) end, LayerBefore),
 
 	Accumulator = maps:new(),
 	lists:map(fun(Pid) -> maps:put(Pid, 0, Accumulator) end, LayerAfter),
 
+	% loop runs M times
+	% returns Accumulator
 
+	% use Accumulator to update ThetaMap
 
+	% do again. 
 
-
-
-	loop runs M times
-	returns Accumulator
-
-	use Accumulator to update ThetaMap
-
-	do again. 
-
-	send messages to first layer. 
-	receive from last layer. 
-	send actual to last layer. 
-	make sure backprop stops for first layer. 
-
-
-
+	% send messages to first layer. 
+	% receive from last layer. 
+	% send actual to last layer. 
+	% make sure backprop stops for first layer. 
 
 	loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator)
 
-	Bigloop -> 
-		loop 
-		Bigloop()
+	% Bigloop -> 
+	% 	loop 
+	% 	Bigloop()
 
 
 
