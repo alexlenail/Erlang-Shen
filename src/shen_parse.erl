@@ -49,13 +49,18 @@ arff_line_type(Line) ->
     end.
 
 
-arff_get_classes(UnsplitClasses) -> string:tokens(string:substr(UnsplitClasses, 2, string:len(UnsplitClasses)-2), ",").
+arff_get_classes(UnsplitClasses) ->
+    strlist_cast_numeric(string:tokens(string:substr(UnsplitClasses, 2, string:len(UnsplitClasses)-2), ",")).
 
 
-arff_get_instance(Line) -> lists:map(fun(N) -> try_cast_numeric(N) end, string:tokens(Line, ",")).
+arff_get_instance(Line) ->
+    strlist_cast_numeric(string:tokens(Line, ",")).
 
 
-try_cast_numeric(N) ->
+strlist_cast_numeric(List) -> lists:map(fun(X) -> str_try_cast_numeric(X) end, List).
+
+
+str_try_cast_numeric(N) ->
     case string:to_float(N) of
         {error, no_float} ->
             case string:to_integer(N) of
