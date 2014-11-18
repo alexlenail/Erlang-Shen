@@ -28,7 +28,7 @@ arff_line_by_line(Fd, NumAttrs, Classes, Instances) ->
     end.
 
 
-arff_line_type("\n") -> skipline;
+arff_line_type("") -> skipline;
 arff_line_type("@data") -> skipline;
 arff_line_type(Line) ->
     case string:chr(Line, $%) of
