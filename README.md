@@ -1,26 +1,25 @@
-﻿Neural Networks in Erlang
-=========================
+﻿# Neural Networks in Erlang
 
-Alex Lenail and Sunjay Bhatia
------------------------------
+### Alex Lenail and Sunjay Bhatia
 
+---------------------------------
 
 Deep learning is an emerging approach at machine learning which re-implements and extends neural networks, an older category of algorithms that have only recently been found to shine particularly brightly in the context of rapidly growing amounts of computational power and data. Deep learning is a massively parallelizable process, so much so that it is traditionally implemented on Graphical Processing Units (GPUs), though it doesn’t need to be. Deep learning algorithms have especially been exploited in two application spaces in industry: image and language recognition. These are particularly apt problem spaces for neural networks because they perform feature selection and feature representation independently of human input, which is to say, they learn to understand language better than we can describe it to them, in much the same way a baby might learn language as a result of being repeatedly exposed to it. 
 
 In the context of images, the feature transformations can be visualized, as below:
   
 
+
 For the purposes of image recognition, the features extracted are initially lines and shapes (this is usually done with sparse coding) which together represent the image (in much the same way human brains initially extract lines and contrast from an image). Then, the new representation of the input is once again analyzed, developing increasingly complex representations of the input, until true recognition is achieved. 
 Deep learning is exciting, for a couple of reasons. First, it’s new, which means that we don’t actually know quite what it can accomplish for us. Secondly, it bears the promise of actually unveiling something about genuine intelligence which other learning algorithms do not. Due to its biologically motivated origin, although the hardware is dramatically different than an actual brain, it has accidentally mimicked the solutions arrived at by the human brain in a variety of application spaces. 
 
-
 We believe that in order to understand a thing, truly and entirely, you must take it apart and put it back together again. We’d like to implement a fairly naive parallelized neural network in erlang or go, and test it against standard UCI datasets. We’d also like to experiment with how it might work against standard image recognition datasets, such as ImageNet. 
-
 
 Thankfully, a number of open source resources exist detailing the topic (some of which can be found in the References). That means it shouldn’t be too difficult to develop an understanding of these techniques, and implement them. But re-implementing an existing algorithm isn’t meaningful enough a piece of work to turn in as a final project, nor is it very groundbreaking given that although this is still a young algorithm, many open source repositories exist with functional source code. So the final piece of this project will be to deploy our algorithm against a dataset we haven’t seen deep learning leveraged against. We don’t necessarily expect impressive results, but we hope we might uncover something interesting. 
 
-Deliverables:
+----------------
 
+### Deliverables:
 
 Minimum: A functional neural network we implement which operates successfully on the UCI datasets, and has output to some other dataset in which deep learning hasn’t been applied.
 
@@ -32,18 +31,20 @@ First Step: Functional Algorithm on UCI datasets.
 
 Biggest potential problem: If we go with Erlang, it might not lend itself to heavily mathy code. If we go with Go, we will need to learn a sizeable part of the language in order to implement a deep learning algorithm. The implementation work also isn’t too parallelizable, but with careful consideration and design of good abstractions the work should be divisible. 
 
+----------------
 
-References: 
+###References: 
+
 http://deeplearning.stanford.edu/tutorial/
 http://deeplearning.net/ especially http://deeplearning.net/datasets/
 http://www.iro.umontreal.ca/~bengioy/dlbook/
 http://image-net.org/
 http://archive.ics.uci.edu/ml/
-________________
 
-Design Proposal
+=================
 
-Technologies
+
+### Technologies
 
 
 In the interest of simplicity, we’ve elected to move forward with Erlang as our language of choice. There are a variety of reasons we arrived at this conclusion but the most important one was that we care deeply about the deep learning and not so much for the message-passing language upon which it is implemented, and since we already know some erlang and it hides many of the implementation details from us, especially with regards to concurrency, this was the natural choice. More importantly still, we have a really cool team name that relies on our use of Erlang. Although Go would have yielded advantages for the mathematical aspects of our project, notably the matrix manipulations inherent in this algorithm, we felt that learning a new language and concurrency model weren’t worth it. 
@@ -52,7 +53,7 @@ In the interest of simplicity, we’ve elected to move forward with Erlang as ou
 With regards to exploring the potential of implementing these algorithms on GPUs, which we were considering earlier, it seems that there are very few implemented bindings between major GPU SDKs and Erlang (though a couple unstable ones under active development). Though we’d like to keep this option open, for the meantime we are focusing on implementing a neural network in Erlang for CPUs. 
 
 
-Algorithm Design: A brief tutorial on Neural Networks
+### Algorithm Design: A brief tutorial on Neural Networks
 
 
 Neural Networks are often explained with the visual aid of a graph of columns of vertices and connecting edges, which happen to map well to the two major constituent parts of the algorithm: neurons and synapses. Each ‘neuron’, which is drawn as a node and will be implemented as a process, takes input (messages) from it’s ‘dendrites’ or ‘input wires’ and outputs the computed sigmoid function of those inputs, passing that along to those next neurons in the network as ‘output’. 
@@ -76,7 +77,7 @@ At each node in each layer, we have some amount of error in our model’s learne
 In order to find the error in our network’s prediction, we compare our predicted output to the desired output. This where the concept of back propagation comes in, we work backwards in the network and update each node’s error based on the next layer’s error and the nodes which it propagates to. The gradient of the error is calculated and we use gradient descent to update weights such that the error at that node converges towards a local minimum. The image above shows a multidimensional error function, where the blue valleys represent a more optimal setting of two model parameters with respect to error function J(Θ). With the algorithms random initialization, we start at a random point and using the gradient descent, we attempt to descend into one of these low error valleys (in a hyperdimensional space of model parameters).
 
 
-Algorithm Design: Implementation Details
+### Algorithm Design: Implementation Details
 
 
 The main design decision that we must make is how to represent each node in our network and the interface with which nodes interact. These forward and back propagation algorithms lend themselves well to Erlang’s concurrency model and message passing between processes. Nodes in a layer are independent and can operate concurrently when performing matrix operations on our learned weights/error matrices. 
@@ -99,7 +100,7 @@ Our implementation of this algorithm also hinges on a robust matrix manipulation
 
 
 
-Development Plan
+### Development Plan
 
 
 So far, we’ve gotten up to speed on the algorithm which we want to learn: neural networks. We’ve each studied them using resources online and discussed the finer points of their implementation, as applied to erlang. 
