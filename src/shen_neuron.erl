@@ -1,12 +1,19 @@
 -module (shen_neuron).
--export ([start/1]).
 
+-behaviour(application).
+
+%% Application callbacks
+-export([start/2, stop/1]).
+
+
+%% ===================================================================
+%% Application callbacks
+%% ===================================================================
 
 -define(INIT_EPSILON, 0.0001).
 
-
-start(M) ->
-
+start(_StartType, [M]) ->
+	shen_neuron_sup:start_link(),
 	receive
 		{NetworkPid, LayerBefore, LayerAfter} -> ok
 		% LayerBefore and LayerAfter are PID lists. 
@@ -18,6 +25,13 @@ start(M) ->
 
 	outerLoop(LayerBefore, LayerAfter, ThetaMap, M).
 
+stop(_State) ->
+    ok.
+
+
+%% ===================================================================
+%% Internal Logic
+%% ===================================================================
 
 outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->
 
