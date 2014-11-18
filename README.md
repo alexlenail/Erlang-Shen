@@ -8,7 +8,7 @@ Deep learning is an emerging approach at machine learning which re-implements an
 
 In the context of images, the feature transformations can be visualized, as below:
   
-[fail](doc/img/image00.png)
+<!-- [fail](doc/img/image00.png) -->
 
 For the purposes of image recognition, the features extracted are initially lines and shapes (this is usually done with sparse coding) which together represent the image (in much the same way human brains initially extract lines and contrast from an image). Then, the new representation of the input is once again analyzed, developing increasingly complex representations of the input, until true recognition is achieved. 
 Deep learning is exciting, for a couple of reasons. First, it’s new, which means that we don’t actually know quite what it can accomplish for us. Secondly, it bears the promise of actually unveiling something about genuine intelligence which other learning algorithms do not. Due to its biologically motivated origin, although the hardware is dramatically different than an actual brain, it has accidentally mimicked the solutions arrived at by the human brain in a variety of application spaces. 
@@ -58,11 +58,11 @@ With regards to exploring the potential of implementing these algorithms on GPUs
 
 Neural Networks are often explained with the visual aid of a graph of columns of vertices and connecting edges, which happen to map well to the two major constituent parts of the algorithm: neurons and synapses. Each ‘neuron’, which is drawn as a node and will be implemented as a process, takes input (messages) from it’s ‘dendrites’ or ‘input wires’ and outputs the computed sigmoid function of those inputs, passing that along to those next neurons in the network as ‘output’. 
   
-[fail](doc/img/image01.png)
+<!-- [fail](doc/img/image01.png) -->
 
 This leads us to the ‘forward propagation’ algorithm, which maps input to output, which is how predictions are made on test sets but also a core piece of the ‘back propagation’ algorithm which is used to train the model (and which is also described further down).  
 
-[fail](doc/img/image02.png)
+<!-- [fail](doc/img/image02.png) -->
 
 Forward propagation is an algorithm which computes the ‘activation’ of each neuron, from left to right. The activation of a neuron is isomorphic to whether or not that neuron can be said to have ‘fired’. The hidden layer a(2) has three neurons: a(2)(1), a(2)(2), and a(2)(3). The activation of each is the sigmoid function g of the linear combination of the previous layer (in this case, the input x) weighted by the model at that layer, Θ(2). This can conveniently be expressed as a matrix vector product: g ( Θ(2) * x ). Forward propagation eventually maps the input through the extracted features in the hidden layers to an output, h_Θ(x) by repeating the above procedure appropriately given the topology of the particular network. 
 
@@ -72,7 +72,7 @@ In order to tune our network’s model Θ to improve the accuracy of our mapping
 
 At each node in each layer, we have some amount of error in our model’s learned weights. These errors percolate through to some amount of error in our output layer, which we can observe when training our model. This motivates an algorithm which adequately distributes the ‘wrongness’ of the output to the weights in the model and gently shifts those parameters towards a more optimal solution for each training example. 
    
-[fail](doc/img/image03.png)
+<!-- [fail](doc/img/image03.png) -->
 
 In order to find the error in our network’s prediction, we compare our predicted output to the desired output. This where the concept of back propagation comes in, we work backwards in the network and update each node’s error based on the next layer’s error and the nodes which it propagates to. The gradient of the error is calculated and we use gradient descent to update weights such that the error at that node converges towards a local minimum. The image above shows a multidimensional error function, where the blue valleys represent a more optimal setting of two model parameters with respect to error function J(Θ). With the algorithms random initialization, we start at a random point and using the gradient descent, we attempt to descend into one of these low error valleys (in a hyperdimensional space of model parameters).
 
@@ -86,7 +86,7 @@ The main design decision that we must make is how to represent each node in our 
 The first way we will implement this algorithm is with a naive ‘neuron-centric’ architecture, in which each neuron will be a process. It will receive messages from neurons and broadcast messages to other neurons once given proper input. This has a couple advantages. First, we will experiment with the idea of a ‘distributed neural network’ whereby we can have this computation operating on a variety of machines linked together. We expect this will worsen performance, but it proposes an interesting idea and perhaps an avenue for further research. Second, this approach will be simple to put together and extremely intuitive, since neurons are in fact processes which receive and send messages. This gives us a baseline to work with.
 Our first pass at an overall network architecture flow:
   
-[fail](doc/img/image04.png)
+<!-- [fail](doc/img/image04.png) -->
 
 An alternate model would be to abstract further and have each layer as a process as opposed to spawning individual nodes at the top level. Each layer would take care of delegation and nodes/neuron processes would simply be computation units that do not interact directly. The layers would be the vessels for message passing and accumulating outputs to pass to the next/previous layer for forward and back propagation.
 
