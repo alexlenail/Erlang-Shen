@@ -5,11 +5,11 @@
 -define(INIT_EPSILON, 0.0001).
 
 
-% LayerBefore and LayerAfter are PID lists. 
 start(M) ->
 
 	receive
 		{NetworkPid, LayerBefore, LayerAfter} -> ok
+		% LayerBefore and LayerAfter are PID lists. 
 	end,
 
 	% random initialization of Thetas
