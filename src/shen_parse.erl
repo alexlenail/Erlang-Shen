@@ -33,14 +33,18 @@ arff_line_type(Line) ->
     case string:chr(Line, $%) of
         1 -> skipline;
         _ ->
-            case string:str(Line, "@attribute") of
-                1 ->
-                    SplitLine = string:tokens(Line, " "),
-                    case lists:nth(2, SplitLine) of
-                        "class" -> {classes, lists:nth(3,SplitLine)};
-                        _ -> attribute
-                    end;
-                _ -> instance
+            case string:str(Line, "@relation") of
+                1 -> skipline;
+                _ ->
+                    case string:str(Line, "@attribute") of
+                        1 ->
+                            SplitLine = string:tokens(Line, " "),
+                            case lists:nth(2, SplitLine) of
+                                "class" -> {classes, lists:nth(3,SplitLine)};
+                                _ -> attribute
+                            end;
+                        _ -> instance
+                    end
             end
     end.
 
@@ -48,4 +52,15 @@ arff_line_type(Line) ->
 arff_get_classes(UnsplitClasses) -> string:tokens(string:substr(UnsplitClasses, 2, string:len(UnsplitClasses)-2), ",").
 
 
-arff_get_instance(Line) -> string:tokens(Line, ",").
+arff_get_instance(Line) -> lists:map(fun(N) -> try_cast_numeric(N) end, string:tokens(Line, ",")).
+
+
+try_cast_numeric(N) ->
+    case string:to_float(N) of
+        {error, no_float} ->
+            case string:to_integer(N) of
+                {error, no_integer} -> N;
+                {I, _Rest} -> I
+            end;
+        {F, _Rest} -> F
+    end.
