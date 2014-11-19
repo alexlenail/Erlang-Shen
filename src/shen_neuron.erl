@@ -1,4 +1,4 @@
--module (shen_neuron).
+-module(shen_neuron).
 
 -behaviour(application).
 
@@ -30,7 +30,7 @@ stop(_State) ->
 
 
 %% ===================================================================
-%% Internal Logic
+%% Internal functions
 %% ===================================================================
 
 outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->

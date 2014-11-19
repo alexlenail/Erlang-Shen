@@ -8,7 +8,7 @@
 
 `make clean && make`
 
-`erl -pa ebin`
+`erl -pa ebin -pa deps/*/ebin`
 
 `?> application:start(shen).`
 
