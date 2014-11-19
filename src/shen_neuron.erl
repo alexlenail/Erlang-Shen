@@ -1,12 +1,19 @@
 -module (shen_neuron).
--export ([start/1]).
 
+-behaviour(application).
+
+%% Application callbacks
+-export([start/2, stop/1]).
+
+
+%% ===================================================================
+%% Application callbacks
+%% ===================================================================
 
 -define(INIT_EPSILON, 0.0001).
 
-
-start(M) ->
-
+start(_StartType, [M]) ->
+	shen_neuron_sup:start_link(),
 	receive
 		{NetworkPid, LayerBefore, LayerAfter} -> ok
 		% LayerBefore and LayerAfter are PID lists. 
@@ -18,6 +25,13 @@ start(M) ->
 
 	outerLoop(LayerBefore, LayerAfter, ThetaMap, M).
 
+stop(_State) ->
+    ok.
+
+
+%% ===================================================================
+%% Internal Logic
+%% ===================================================================
 
 outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->
 
@@ -26,17 +40,17 @@ outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->
 	lists:map(fun(Pid) -> maps:put(Pid, 0, Accumulator) end, LayerAfter),
 
 	% One iteration of training
-	Accumulated = loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator, M).
+	Accumulated = loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator, M),
 
 	% Compute Partial Derivatives
 	DMap = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, (1/M) * maps:get(Pid, Accumulated) + Lambda * maps:get(Pid, ThetaMap), DMap), LayerAfter),
+	lists:map(fun(Pid) -> maps:put(Pid, (1/M) * maps:get(Pid, Accumulated) + Lambda * maps:get(Pid, ThetaMap), DMap) end, LayerAfter),
 	maps:put(Bias, (1/M) * maps:get(Pid, Accumulated), DMap),
 
 	% Update Weights
 	NewThetaMap = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, maps:get(Pid, ThetaMap) - Alpha * maps:get(Pid, DMap), NewThetaMap), LayerBefore)
-	maps:put(Bias, maps:get(Bias, ThetaMap) - Alpha * maps:get(Bias, DMap), NewThetaMap)
+	lists:map(fun(Pid) -> maps:put(Pid, maps:get(Pid, ThetaMap) - Alpha * maps:get(Pid, DMap), NewThetaMap) end, LayerBefore),
+	maps:put(Bias, maps:get(Bias, ThetaMap) - Alpha * maps:get(Bias, DMap), NewThetaMap),
 
 	outerLoop(NewThetaMap).
 
@@ -48,32 +62,50 @@ outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->
 
 loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M) ->
 	receive
-		{Pid, Activation} when lists:member(Pid, LayerBefore) ->
-			maps:put(Pid, Activation, ActivationMap),
-			if maps:size() =:= length(LayerBefore) ->
-				forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap),
-				loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), DeltaMap), Accumulator, M;
-			true ->
-				loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
-			end;
-		{Pid, Delta} when member(Pid, LayerAfter) ->
-			maps:put(Pid, Delta, DeltaMap),
-			if maps:size(DeltaMap) =:= length(LayerAfter) ->
-				NewAccumulator = backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator),
-				if M > 1 -> 
-					loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, maps:new(), NewAccumulator, M-1);
-				M =:= 1 -> NewAccumulator
-			true -> 
-				loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
+		{Pid, Data} ->
+			case lists:member(Pid, LayerBefore) of
+				true -> member_layer;
+				false ->
+					case lists:member(Pid, LayerAfter) of
+						true -> member_layerafter;
+						false -> error
+					end
 			end
 		{Pid, input, Input}
 	end.
+
+
+
+	% ****************** Needed to put in case statements because we can't evaluate expressions in if *************
+	% Might want to move the logic below into separate functions for forward and backprop
+
+
+	% 	{Pid, Activation} when lists:member(Pid, LayerBefore) ->
+	% 		maps:put(Pid, Activation, ActivationMap),
+	% 		if maps:size() =:= length(LayerBefore) ->
+	% 			forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap),
+	% 			loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), DeltaMap), Accumulator, M;
+	% 		true ->
+	% 			loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
+	% 		end;
+	% 	{Pid, Delta} when member(Pid, LayerAfter) ->
+	% 		maps:put(Pid, Delta, DeltaMap),
+	% 		case maps:size(DeltaMap) of
+	% 			length(LayerAfter) ->
+	% 				NewAccumulator = backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator),
+	% 				if M > 1 ->
+	% 					loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, maps:new(), NewAccumulator, M-1);
+	% 				M =:= 1 -> NewAccumulator
+	% 				end;
+	% 			_ -> loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
+	% 		end
+	% end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap) ->
 	LinearCombination = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, ActivationMap) * maps:get(Pid, ThetaMap) end, LayerBefore)),
-	Activation = g(LinearCombination + maps:get(Bias, ThetaMap))
+	Activation = g(LinearCombination + maps:get(Bias, ThetaMap)),
 	lists:map(fun(Pid) -> Pid ! {self(), Activation} end, LayerAfter),
 	Activation. 
 
