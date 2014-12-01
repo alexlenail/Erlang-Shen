@@ -5,7 +5,7 @@
 %% API
 -export([start_link/0]).
 
-%% Supervisor callbacks
+%% Supervisor Callbacks
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
@@ -15,7 +15,7 @@
 
 
 %% ===================================================================
-%% API functions
+%% API Functions
 %% ===================================================================
 
 start_link() ->
@@ -23,7 +23,7 @@ start_link() ->
 
 
 %% ===================================================================
-%% Supervisor callbacks
+%% Supervisor Callbacks
 %% ===================================================================
 
 init([]) ->

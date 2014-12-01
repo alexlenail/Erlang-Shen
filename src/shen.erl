@@ -1,52 +1,37 @@
 -module(shen).
-
 -behaviour(application).
 
-%% Application callbacks
+%% API
+-export([run/3]).
+
+%% Application Callbacks
 -export([start/2, stop/1]).
 
 
 %% ===================================================================
-%% Application callbacks
+%% API Functions
 %% ===================================================================
 
-start(_StartType, [TrainSet, TestSet, HiddenLayers]) ->
-	shen_sup:start_link(),
+run(TrainSet, TestSet, HiddenLayers) ->
 	case shen_parse:arff(TrainSet) of
 		{error, _Reason} -> {error, "Invalid training data file"};
-		{ok, NumAttrs, Classes, Instances} ->
-			InputLayer = spawn_neurons(NumAttrs, Classes)
-			% gradient descent loop, train network
-			% get training data
-			% test run and calculate accuracy
+		{ok, {NumAttrs, Classes, TrainInstances}} ->
+			case shen_parse:arff(TestSet) of
+				{ok, {NumAttrs, Classes, TestInstances}} ->
+					InputLayer = shen_network:start(NumAttrs, Classes, HiddenLayers),
+					shen_network:train(InputLayer, TrainInstances),
+					shen_network:test(InputLayer, TestInstances);
+				_TestDataError -> {error, "Invalid test data file"}
+			end
 	end.
 
+
+%% ===================================================================
+%% Application Callbacks
+%% ===================================================================
+
+start(_StartType, _Args) ->
+	shen_sup:start_link().
+
 stop(_State) ->
-    ok.
-    % clean up whatever needs to be cleaned
-
-
-%% ===================================================================
-%% Internal Logic
-%% ===================================================================
-
-% spawn neurons and return pid list of input layer
-% maybe be need number of training instances?
-spawn_neurons(NumAttrs, Classes) -> ok.
-	% Network = [[spawn(neuron, start, []) || X <- lists:seq(Dimension)] || Dimension <- NetworkArchitecture],
-
-	% lists:foldl(fun(Layer, LayerAfter) -> lists:map(fun(Neuron) -> Neuron ! LayerAfter, Layer end, [], Network),
-	% lists:foldr(fun(Layer, LayerBefore) -> lists:map(fun(Neuron) -> Neuron ! LayerBefore, Layer end, Layer, Network).
-
-	% Make a first and last layer. 
-
-	% First Layer
-	% Find the dimensionality of the training data. 
-	% Send appropriate Pids. 
-
-	% Last layer
-	% Find the dimenionality of the labels. 
-	% Send the last hidden layer these Pids, and send these Pids the Layerbefore. 
-
-
-% bias units?
+    ok. % clean up whatever needs to be cleaned

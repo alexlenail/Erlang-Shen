@@ -1,58 +1,59 @@
 -module(shen_neuron).
 
--behaviour(application).
+% -behaviour(application).
 
-%% Application callbacks
--export([start/2, stop/1]).
+%% Application Callbacks
+% -export([start/2, stop/1]).
 
 
 %% ===================================================================
-%% Application callbacks
+%% Application Callbacks
 %% ===================================================================
 
 -define(INIT_EPSILON, 0.0001).
 
-start(_StartType, [M]) ->
-	shen_neuron_sup:start_link(),
-	receive
-		{NetworkPid, LayerBefore, LayerAfter} -> ok
-		% LayerBefore and LayerAfter are PID lists. 
-	end,
+% start(_StartType, [M]) ->
+% 	shen_neuron_sup:start_link(),
+% 	ok.
+	% receive
+	% 	{NetworkPid, LayerBefore, LayerAfter} -> ok
+	% 	% LayerBefore and LayerAfter are PID lists. 
+	% end,
 
-	% random initialization of Thetas
-	ThetaMap = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, ThetaMap) end, LayerBefore),
+	% % random initialization of Thetas
+	% ThetaMap = maps:new(),
+	% lists:map(fun(Pid) -> maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, ThetaMap) end, LayerBefore),
 
-	outerLoop(LayerBefore, LayerAfter, ThetaMap, M).
+	% outerLoop(LayerBefore, LayerAfter, ThetaMap, M).
 
-stop(_State) ->
-    ok.
+% stop(_State) ->
+%     ok.
 
 
 %% ===================================================================
-%% Internal functions
+%% Internal Functions
 %% ===================================================================
 
-outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->
+outerLoop(LayerBefore, LayerAfter, ThetaMap, M) -> ok.
 
-	% Initialize the Accumulator, accumulates error
-	Accumulator = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, 0, Accumulator) end, LayerAfter),
+	% % Initialize the Accumulator, accumulates error
+	% Accumulator = maps:new(),
+	% lists:map(fun(Pid) -> maps:put(Pid, 0, Accumulator) end, LayerAfter),
 
-	% One iteration of training
-	Accumulated = loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator, M),
+	% % One iteration of training
+	% Accumulated = loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator, M),
 
-	% Compute Partial Derivatives
-	DMap = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, (1/M) * maps:get(Pid, Accumulated) + Lambda * maps:get(Pid, ThetaMap), DMap) end, LayerAfter),
-	maps:put(Bias, (1/M) * maps:get(Pid, Accumulated), DMap),
+	% % Compute Partial Derivatives
+	% DMap = maps:new(),
+	% lists:map(fun(Pid) -> maps:put(Pid, (1/M) * maps:get(Pid, Accumulated) + Lambda * maps:get(Pid, ThetaMap), DMap) end, LayerAfter),
+	% maps:put(Bias, (1/M) * maps:get(Pid, Accumulated), DMap),
 
-	% Update Weights
-	NewThetaMap = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, maps:get(Pid, ThetaMap) - Alpha * maps:get(Pid, DMap), NewThetaMap) end, LayerBefore),
-	maps:put(Bias, maps:get(Bias, ThetaMap) - Alpha * maps:get(Bias, DMap), NewThetaMap),
+	% % Update Weights
+	% NewThetaMap = maps:new(),
+	% lists:map(fun(Pid) -> maps:put(Pid, maps:get(Pid, ThetaMap) - Alpha * maps:get(Pid, DMap), NewThetaMap) end, LayerBefore),
+	% maps:put(Bias, maps:get(Bias, ThetaMap) - Alpha * maps:get(Bias, DMap), NewThetaMap),
 
-	outerLoop(NewThetaMap).
+	% outerLoop(NewThetaMap).
 
 	% send messages to first layer. 
 	% receive from last layer. 
@@ -60,19 +61,19 @@ outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->
 	% make sure backprop stops for first layer. 
 
 
-loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M) ->
-	receive
-		{Pid, Data} ->
-			case lists:member(Pid, LayerBefore) of
-				true -> member_layer;
-				false ->
-					case lists:member(Pid, LayerAfter) of
-						true -> member_layerafter;
-						false -> error
-					end
-			end
-		{Pid, input, Input}
-	end.
+loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M) -> ok.
+	% receive
+	% 	{Pid, Data} ->
+	% 		case lists:member(Pid, LayerBefore) of
+	% 			true -> member_layer;
+	% 			false ->
+	% 				case lists:member(Pid, LayerAfter) of
+	% 					true -> member_layerafter;
+	% 					false -> error
+	% 				end
+	% 		end
+	% 	{Pid, input, Input}
+	% end.
 
 
 
@@ -103,31 +104,31 @@ loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap) ->
-	LinearCombination = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, ActivationMap) * maps:get(Pid, ThetaMap) end, LayerBefore)),
-	Activation = g(LinearCombination + maps:get(Bias, ThetaMap)),
-	lists:map(fun(Pid) -> Pid ! {self(), Activation} end, LayerAfter),
-	Activation. 
+forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap) -> ok.
+	% LinearCombination = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, ActivationMap) * maps:get(Pid, ThetaMap) end, LayerBefore)),
+	% Activation = g(LinearCombination + maps:get(Bias, ThetaMap)),
+	% lists:map(fun(Pid) -> Pid ! {self(), Activation} end, LayerAfter),
+	% Activation. 
 
 
 g(Z) -> 1/(1+math:exp(-Z)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator) -> 
+backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator) -> ok.
 	
-	Error = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, DeltaMap) * maps:get(Pid, ThetaMap) end, LayerAfter)),
-	Delta = Activation * (1- Activation) * Error,
+	% Error = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, DeltaMap) * maps:get(Pid, ThetaMap) end, LayerAfter)),
+	% Delta = Activation * (1- Activation) * Error,
 
-	lists:map(fun(Pid) -> 
-				Change = Activation * maps:get(Pid, DeltaMap),
-				maps:put(Pid, maps:get(Pid, Accumulator) + Change, Accumulator)
-			end,
-		LayerAfter),
+	% lists:map(fun(Pid) -> 
+	% 			Change = Activation * maps:get(Pid, DeltaMap),
+	% 			maps:put(Pid, maps:get(Pid, Accumulator) + Change, Accumulator)
+	% 		end,
+	% 	LayerAfter),
 
-	lists:map(fun(Pid) -> Pid ! {self(), Delta} end, LayerBefore), 
+	% lists:map(fun(Pid) -> Pid ! {self(), Delta} end, LayerBefore), 
 
-	Accumulator.
+	% Accumulator.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

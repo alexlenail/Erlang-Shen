@@ -3,7 +3,7 @@ REBAR := ./rebar
 .PHONY: all clean
 
 all:
-	$(REBAR) get-deps && $(REBAR) compile
+	$(REBAR) compile
 
 # doc:
 # 	$(REBAR) doc
@@ -12,7 +12,7 @@ all:
 # 	$(REBAR) eunit
 
 clean:
-	$(REBAR) clean && $(REBAR) delete-deps
+	$(REBAR) clean
 
 # release: all test
 # 	typer -r ./src/ > /dev/null
