@@ -10,7 +10,7 @@
 
 arff(Fname) ->
     case file:open(Fname, [read, raw]) of
-        {error, Reason} -> erlang:display(Reason), {error, Reason};
+        {error, Reason} -> {error, Reason};
         {ok, Fd} -> arff_line_by_line(Fd, 0, [], [])
     end.
 
@@ -68,7 +68,8 @@ arff_get_instance(Line) ->
 %% General Internal Functions
 %% ===================================================================
 
-strlist_cast_numeric(List) -> lists:map(fun(X) -> str_try_cast_numeric(X) end, List).
+strlist_cast_numeric(List) ->
+    lists:map(fun(X) -> str_try_cast_numeric(X) end, List).
 
 str_try_cast_numeric(N) ->
     case string:to_float(N) of

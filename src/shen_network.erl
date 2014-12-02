@@ -5,19 +5,57 @@
 
 
 %% ===================================================================
-%% API
+%% API Functions
 %% ===================================================================
 
-start(NumAttrs, Classes, HiddenLayers) -> erlang:display(start_neurons), ok.
+% starts network specified by NumAttrs and HiddenLayers parameters
+start(NumAttrs, Classes, HiddenLayers) ->
+	erlang:display(start_neurons),
+	% start input layer
+	{ok, InputLayer} = start_layer(NumAttrs),
+	erlang:display(InputLayer),
+	% start hidden layers
+	HiddenLayerPids = lists:map(fun(LayerSize) ->
+									{ok, LayerPids} = start_layer(LayerSize),
+									LayerPids
+								end,
+								HiddenLayers),
+	erlang:display(HiddenLayerPids),
+	% start output layer
+	{ok, OutputLayer} = start_layer(1),
+	% connect layers forwards
 
-train(InputLayer, TrainSet) -> erlang:display(train), ok.
+	% connect layers backwards
 
-test(InputLayer, TestSet) -> erlang:display(test), ok.
+	% return input layer so we can send it instances
+	InputLayer.
+
+train(InputLayer, TrainSet) ->
+	erlang:display(train),
+	ok.
+
+test(InputLayer, TestSet) ->
+	erlang:display(test),
+	ok.
 
 
 %% ===================================================================
 %% Internal Functions
 %% ===================================================================
+
+% starts LayerSize neurons and returns a list of ther Pids
+start_layer(LayerSize) -> start_layer(LayerSize, []).
+start_layer(0, Pids) -> {ok, Pids};
+start_layer(LayerSize, Pids) ->
+	% start new neuron and link to supervisor
+	case shen_sup:start_child() of
+		{error, Reason} -> {error, Reason};
+		{ok, ChildPid} ->
+			% gen_server:cast(ChildPid, Type). ??????
+			start_layer(LayerSize-1, [ChildPid | Pids])
+	end.
+
+
 
 
 

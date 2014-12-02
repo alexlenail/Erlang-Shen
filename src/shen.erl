@@ -14,14 +14,16 @@
 
 run(TrainSet, TestSet, HiddenLayers) ->
 	case shen_parse:arff(TrainSet) of
-		{error, _Reason} -> {error, "Invalid training data file"};
+		{error, _Reason} ->
+			{error, invalid_training_data};
 		{ok, {NumAttrs, Classes, TrainInstances}} ->
 			case shen_parse:arff(TestSet) of
 				{ok, {NumAttrs, Classes, TestInstances}} ->
 					InputLayer = shen_network:start(NumAttrs, Classes, HiddenLayers),
 					shen_network:train(InputLayer, TrainInstances),
 					shen_network:test(InputLayer, TestInstances);
-				_TestDataError -> {error, "Invalid test data file"}
+				_TestDataError ->
+					{error, invalid_test_data}
 			end
 	end.
 

@@ -1,20 +1,61 @@
 -module(shen_neuron).
+-behaviour(gen_server).
 
-% -behaviour(application).
+%% API
+-export([start_link/0]).
 
-%% Application Callbacks
-% -export([start/2, stop/1]).
-
-
-%% ===================================================================
-%% Application Callbacks
-%% ===================================================================
+%% Gen Server Callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
 
 -define(INIT_EPSILON, 0.0001).
 
-% start(_StartType, [M]) ->
-% 	shen_neuron_sup:start_link(),
-% 	ok.
+
+%% ===================================================================
+%% API Functions
+%% ===================================================================
+
+start_link() ->
+    gen_server:start_link(?MODULE, [], []).
+
+
+%% ===================================================================
+%% Gen Server Callbacks
+%% ===================================================================
+
+init(_Args) ->
+	io:format("init neuron (~w)~n", [self()]),
+
+	% initial state of pid lists, thetas, deltas etc. initialized here
+	% random init of thetas
+
+	State = {},
+
+    {ok, State}.
+
+handle_call(_Request, _From, State) ->
+    {reply, ok, State}.
+
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(_Reason, _State) ->
+    ok.
+
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+
+%% ===================================================================
+%% Internal Functions
+%% ===================================================================
+
+
+
+
 	% receive
 	% 	{NetworkPid, LayerBefore, LayerAfter} -> ok
 	% 	% LayerBefore and LayerAfter are PID lists. 
@@ -26,15 +67,10 @@
 
 	% outerLoop(LayerBefore, LayerAfter, ThetaMap, M).
 
-% stop(_State) ->
-%     ok.
 
 
-%% ===================================================================
-%% Internal Functions
-%% ===================================================================
 
-outerLoop(LayerBefore, LayerAfter, ThetaMap, M) -> ok.
+% outerLoop(LayerBefore, LayerAfter, ThetaMap, M) -> ok.
 
 	% % Initialize the Accumulator, accumulates error
 	% Accumulator = maps:new(),
@@ -61,7 +97,7 @@ outerLoop(LayerBefore, LayerAfter, ThetaMap, M) -> ok.
 	% make sure backprop stops for first layer. 
 
 
-loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M) -> ok.
+% loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M) -> ok.
 	% receive
 	% 	{Pid, Data} ->
 	% 		case lists:member(Pid, LayerBefore) of
@@ -104,18 +140,18 @@ loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap) -> ok.
+% forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap) -> ok.
 	% LinearCombination = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, ActivationMap) * maps:get(Pid, ThetaMap) end, LayerBefore)),
 	% Activation = g(LinearCombination + maps:get(Bias, ThetaMap)),
 	% lists:map(fun(Pid) -> Pid ! {self(), Activation} end, LayerAfter),
 	% Activation. 
 
 
-g(Z) -> 1/(1+math:exp(-Z)).
+% g(Z) -> 1/(1+math:exp(-Z)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator) -> ok.
+% backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator) -> ok.
 	
 	% Error = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, DeltaMap) * maps:get(Pid, ThetaMap) end, LayerAfter)),
 	% Delta = Activation * (1- Activation) * Error,
