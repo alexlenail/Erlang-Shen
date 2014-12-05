@@ -29,14 +29,13 @@ start_link(Args) ->
 
 init({{network_pid, NetworkPid}, {neuron_type, Type}}) ->
 	io:format("init neuron (~w)~n", [self()]),
-
-	% initial state of pid lists, thetas, deltas etc. initialized here
 	InitState = #neuron{network_pid = NetworkPid, type = Type},
 	erlang:display(InitState),
     {ok, InitState}.
 
 handle_cast(Msg, State) ->
 	NewState = update(Msg, State),
+    erlang:display(NewState),
     {noreply, NewState}.
 
 handle_call(_Request, _From, State) ->
@@ -59,23 +58,31 @@ code_change(_OldVsn, State, _Extra) ->
 % handle messages and update state record accordingly
 update({layer_before, LayerBefore}, State) ->
 	case State#neuron.type of
-		input -> InitThetas = undefined;
+		input -> Thetas = undefined;
 		_Else ->
-			% randomly init thetas
-			Thetas = maps:new(),
-			lists:map(fun(Pid) ->
-						maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, Thetas)
-			  		  end,
-			  		  LayerBefore)
+			Thetas = random_init_thetas(LayerBefore)
 	end,
 	State#neuron{layer_before = LayerBefore, thetas = Thetas};
 update({layer_after, LayerAfter}, State) ->
 	State#neuron{layer_after = LayerAfter};
+update({forwardprop, X}, State) ->
+	% case
+	State;
+update({backprop, X}, State) ->
+	State;
 update(_Msg, State) ->
     State.
 
-
-
+% returns map of random initial theta value for each Pid in LayerBefore as a key
+random_init_thetas(LayerBefore) -> 
+    lists:foldr(fun(Pid, AccumMap) ->
+                    % generate a truly random number
+                    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
+                    random:seed(A, B, C),
+                    maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, AccumMap)
+                end,
+                maps:new(),
+                LayerBefore).
 
 
 
@@ -180,5 +187,3 @@ update(_Msg, State) ->
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % gradient checking?
-
-

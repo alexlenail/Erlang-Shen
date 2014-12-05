@@ -127,5 +127,3 @@ connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 
 
 % bias units?
-
-
