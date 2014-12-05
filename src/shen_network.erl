@@ -75,8 +75,8 @@ connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 							  Layer),
 					Layer
 				end,
-				OutputLayer,
-				lists:append([[InputLayer], HiddenLayers])),
+				[self()],
+				lists:append([[InputLayer], HiddenLayers, [OutputLayer]])),
 	ok.
 
 % forward_back_once([], []) -> 

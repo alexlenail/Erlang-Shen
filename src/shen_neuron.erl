@@ -24,11 +24,11 @@ start_link(Args) ->
 %% ===================================================================
 
 -record(neuron, {network_pid, type, layer_before, layer_after,
-				 inputs = [], activation, thetas, delta = 0}).
+				 inputs = [], activation, thetas, delta = 0, deltas}).
 
 init({{network_pid, NetworkPid}, {neuron_type, Type}}) ->
 	io:format("init neuron (~w)~n", [self()]),
-	InitState = #neuron{network_pid = NetworkPid, type = Type},
+	InitState = #neuron{network_pid = NetworkPid, type = Type, deltas = maps:new()},
 	erlang:display(InitState),
     {ok, InitState}.
 
@@ -78,20 +78,39 @@ update({forwardprop, X}, State) ->
 				input -> Activation = lists:sum(NewInputs);
 				_Else -> Activation	= g(lists:sum(NewInputs))
 			end,
-			lists:map(fun({Pid, Theta}) ->
-						gen_server:cast(Pid, {forwardprop, Theta*Activation})
+			lists:map(fun(Pid) ->
+						gen_server:cast(Pid, {forwardprop, maps:get(Pid, State#neuron.thetas)*Activation})
 					  end,
-					  lists:zip(State#neuron.layer_after, State#neuron.thetas)),
+					  State#neuron.layer_after),
 			State#neuron{inputs = [], activation = Activation};
 		false -> % update inputs collected
 			State#neuron{inputs = NewInputs}
 	end;
-update({backprop, X}, State) ->
+update({backprop, NextPid, D}, State) ->
 	case State#neuron.type of
-		input -> ok;
-		hidden -> ok
-	end,
-	State;
+		output ->
+			Delta = State#neuron.activation - D,
+			lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
+		_Else ->
+			% collect deltas from layer after
+			NewDeltas = maps:put(NextPid, D, State#neuron.deltas),
+			case maps:size(NewDeltas) =:= length(State#neuron.layer_after) of
+				true -> % if we have all the delta terms, calculate Delta term and send to previous layer
+					case State#neuron.type of
+						input -> % tell network we have finished training on this instance
+							lists:map(fun(Pid) -> gen_server:cast(Pid, finished), State#neuron.layer_before);
+						hidden -> % 
+							Delta = (State#neuron.activation*(1-State#neuron.activation))*
+									lists:sum(lists:map(fun(Pid) ->
+															maps:get(Pid, State#neuron.thetas)*maps:get(Pid, State#neuron.deltas)
+									  					end,
+									  					State#neuron.layer_after)),
+							lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
+							State#neuron{delta = State#neuron.delta + Delta, deltas = maps:new()};
+				false -> % update deltas collected
+					State#neuron{deltas = NewDeltas}
+			end
+	end;
 update(_Msg, State) ->
     State.
 
