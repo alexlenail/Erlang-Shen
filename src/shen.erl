@@ -12,16 +12,16 @@
 %% API Functions
 %% ===================================================================
 
-run(TrainSet, TestSet, HiddenLayers) ->
+run(TrainSet, TestSet, HiddenLayerDims) ->
 	case shen_parse:arff(TrainSet) of
 		{error, _Reason} ->
 			{error, invalid_training_data};
 		{ok, {NumAttrs, Classes, TrainInstances}} ->
 			case shen_parse:arff(TestSet) of
 				{ok, {NumAttrs, Classes, TestInstances}} ->
-					InputLayer = shen_network:build(NumAttrs, Classes, HiddenLayers),
-					shen_network:train(InputLayer, TrainInstances),
-					shen_network:test(InputLayer, TestInstances);
+					Layers = shen_network:build(NumAttrs, Classes, HiddenLayerDims),
+					shen_network:train(Layers, TrainInstances),
+					shen_network:test(Layers, TestInstances);
 				_TestDataError ->
 					{error, invalid_test_data}
 			end

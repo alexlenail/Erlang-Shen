@@ -3,6 +3,8 @@
 %% API
 -export ([build/3, train/2, test/2]).
 
+-define(LAMBDA, .0005).
+
 
 %% ===================================================================
 %% API Functions
@@ -10,9 +12,7 @@
 
 % starts network specified by NumAttrs and HiddenLayers parameters
 build(NumAttrs, Classes, HiddenLayerDims) ->
-	% this solved a bunch of issues. 
 	register(self(), network),
-
 	% start input layer
 	{ok, InputLayer} = start_layer(NumAttrs, input),
 	% start hidden layers
@@ -23,30 +23,29 @@ build(NumAttrs, Classes, HiddenLayerDims) ->
 								HiddenLayerDims),
 	% start output layer
 	{ok, OutputLayer} = start_layer(1, output),
-	% start bias accumulator process
-	start_bias(),
+	% start collector process for hidden bias units and gradient descent
+	start_collector(),
 	connect_layers(InputLayer, HiddenLayers, OutputLayer),
-	% return input layer so we can send it instances
-	InputLayer.
+	{InputLayer, HiddenLayers, OutputLayer}.
 
-train(InputLayer, TrainSet) ->
+train({InputLayer, HiddenLayers, OutputLayer} TrainSet) ->
 	% generate truly random numbers
     <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
     random:seed(A, B, C),
 
-	% loop until convergence
-		Shuffled = shuffle_instances(TrainSet),
-		lists:map(fun train_instance/1, Shuffled),
+	Shuffled = shuffle_instances(TrainSet),
+	lists:map(fun train_instance/1, Shuffled),
 
-		bias ! {getAccumulatedError, M},
-		receive
-			{accumulatedBiasErrorList, BiasList} -> ok
-		end, 
-		lists:map(fun(Pid) -> gen_server:cast(Pid, {give, AccumulatorPid}) end, Network)
-		receive
-			{deltaMap, Pid, ThetaMap, DeltaMap} -> 
-				Dij = maps:get(Pid, DeltaMap) / M + Lambda * maps:get(Pid) Thetas
-		end,
+	collector ! {getAccumulatedError, length(TrainSet)},
+	receive
+		{accumulatedBiasErrorList, BiasList} -> ok
+	end,
+	% getting thetas and deltas from each neuron
+	lists:flatmap(fun(Pid) ->
+					gen_server:cast(Pid, {descend_gradient, length(TrainSet))
+				  end,
+				  [InputLayer] ++ HiddenLayers ++ [OutputLayer]),
+
 
 
 			% all the deltas from the net
@@ -81,20 +80,24 @@ start_layer(LayerSize, Type, Pids) ->
 
 % =====================================================
 
-start_bias() ->
-	BiasPid = spawn(fun() -> bias_accum(maps:new()) end),
-	register(bias, BiasPid).
+start_collector() ->
+	CollectorPid = spawn(fun() -> collector(maps:new(), maps:new(), maps:new()) end),
+	register(collector, CollectorPid).
 
-bias_accum(BiasMap) ->
+collector(BiasMap, Dij) ->
 	receive
-		{update, Pid, X} ->
+		{bias, Pid, X} ->
 			case find(Pid, BiasMap) of
-				{ok, V} -> bias_accum(maps:put(Pid, V+X, BiasMap));
-				error -> bias_accum(maps:put(Pid, X, BiasMap))
+				{ok, V} -> bias_accum(maps:put(Pid, V+X, BiasMap), Dij);
+				error -> bias_accum(maps:put(Pid, X, BiasMap), Dij)
 			end;
 		{getAccumulatedError, M} -> 
-			network ! {accumulatedBiasErrorList, lists:map(fun({Pid, Bias}) -> {Pid, Bias/M}, maps:to_list(BiasMap))}, 
-			bias_accum(maps:new());
+			network ! {accumulatedBiasErrorList, lists:map(fun({Pid, Bias}) -> {Pid, Bias/M} end, maps:to_list(BiasMap))}, 
+			bias_accum(maps:new(), Dij);
+		% {state, Pid, ThetaMap, DeltaMap} ->
+
+		% 	NewDij = maps:put(Pid, )
+		% 	Dij = maps:get(Pid, DeltaMap) / M + Lambda * maps:get(Pid) Thetas
 		stop -> ok
 	end.
 
@@ -111,7 +114,7 @@ connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 					Layer
 				end,
 				[self()], % connect network to the input layer
-				lists:append([[InputLayer], HiddenLayers, [OutputLayer]])),
+				[InputLayer] ++ HiddenLayers ++ [OutputLayer]),
 	% connect layers backwards
 	lists:foldr(fun(Layer, LayerAfter) ->
 					lists:map(fun(NeuronPid) ->
@@ -121,21 +124,28 @@ connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 					Layer
 				end,
 				[self()],
-				lists:append([[InputLayer], HiddenLayers, [OutputLayer]])),
+				[InputLayer] ++ HiddenLayers ++ [OutputLayer]),
 	ok.
 
-% map across inputlayer, send 1 feature to a node
-% receive message from output layer that we are done with forward
-% send output layer actual class
-% receive messages from input layer saying they are done
 train_instance(InputLayer, Inst) ->
-	Label = stringToInt(lists:last(Inst)),
-	lists:map(fun(Pid, Feature) -> gen_server:cast(Pid, {forwardprop, Feature}) end, lists:zip(InputLayer, lists:droplast(Inst))
+	Label = lists:last(Inst),
+	% map across inputlayer, send 1 feature to a node
+	lists:map(fun({Pid, Attr}) ->
+				gen_server:cast(Pid, {forwardprop, network, Attr})
+			  end,
+			  lists:zip(InputLayer, lists:droplast(Inst)),
+	% receive message from output layer that we are done with forward
 	receive
-		{forwardprop, PrevPid, Prediction} -> PrevPid ! {backprop, network, Prediction - Label}
+		{forwardprop, OutputPid, Prediction} -> % send output layer actual class
+			OutputPid ! {backprop, network, Label}
 	end,
+	% receive messages from input layer saying netowrk is done with this instance
+	train_instance_receive_end(length(InputLayer)).
+
+train_instance_receive_end(0) -> ok.
+train_instance_receive_end(N) ->
 	receive
-		{finished, NewDeltas} -> erlang:display(NewDeltas)
+		{finished, NewDeltas} -> erlang:display(NewDeltas), train_instance_receive_end(N-1)
 	end.
 
 % shuffle list of data instances in random order

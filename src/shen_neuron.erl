@@ -23,16 +23,14 @@ start_link(Args) ->
 %% Gen Server Callbacks
 %% ===================================================================
 
--record(neuron, {network_pid, type, layer_before, layer_after,
-				 inputs = [], activation, thetas, bias_theta, delta = 0, deltas}).
+-record(neuron, {network_pid, type, layer_before, layer_after, inputs = [],
+                 activation, thetas, bias_theta, deltas, delta_collector}).
 
 init({{network_pid, NetworkPid}, {neuron_type, Type}}) ->
 	io:format("init neuron (~w)~n", [self()]),
-	InitState = #neuron{network_pid = NetworkPid, type = Type, deltas = maps:new()}, % DeltaMao
-	erlang:display(InitState),
+	InitState = #neuron{network_pid = NetworkPid, type = Type, deltas = maps:new(), delta_collector = maps:new()},
     {ok, InitState}.
 
-% asynchronous messages
 handle_cast(Msg, State) ->
 	NewState = update(Msg, State),
     erlang:display(NewState),
@@ -55,7 +53,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Functions
 %% ===================================================================
 
-% this f
+% COMMENT PROPERLY
 g(Z) -> 1/(1+math:exp(-Z)).
 
 % handle messages and update state record accordingly
@@ -80,13 +78,13 @@ update({forwardprop, PrevPid, X}, State) ->
 		true -> % if we have all the inputs, calculate activation and send to next layer
 			case State#neuron.type of
 				input -> Activation = lists:sum(NewInputs);
-				_Else -> Activation	= g(lists:sum(NewInputs)+State#neuron.bias_theta)
+				_Else1 -> Activation = g(lists:sum(NewInputs)+State#neuron.bias_theta)
 			end,
 			lists:map(fun(Pid) ->
 						case State#neuron.type of 
-							output -> network ! {forwardprop, maps:get(Pid, State#neuron.thetas)*Activation}
-							_Else -> gen_server:cast(Pid, {forwardprop, maps:get(Pid, State#neuron.thetas)*Activation})
-						end,
+							output -> network ! {forwardprop, self(), maps:get(Pid, State#neuron.thetas)*Activation};
+							_Else2 -> gen_server:cast(Pid, {forwardprop, self(), maps:get(Pid, State#neuron.thetas)*Activation})
+						end
 					end,
 					State#neuron.layer_after),
 			State#neuron{inputs = [], activation = Activation};
@@ -97,44 +95,48 @@ update({backprop, NextPid, D}, State) ->
 	case State#neuron.type of
 		output -> % get difference from actual class and send to previous layer
 			Delta = State#neuron.activation - D,
-			lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
-			bias ! {self(), Delta * State#neuron.bias_theta};
+			lists:map(fun(Pid) ->
+                        gen_server:cast(Pid, {backprop, self(), Delta})
+                      end,
+                      State#neuron.layer_before),
+			collector ! {bias, self(), Delta*State#neuron.bias_theta};
 		_Else ->
 			% collect deltas from layer after
-			NewDeltas = maps:put(NextPid, D, State#neuron.deltas),
+			NewDeltas = maps:put(NextPid, D, State#neuron.delta_collector),
 			case maps:size(NewDeltas) =:= length(State#neuron.layer_after) of
 				true -> % if we have all the delta terms
 					case State#neuron.type of
 						input -> % tell network we have finished training on this instance
-							lists:map(fun(Pid) -> network ! {finished, NewDeltas}) end, State#neuron.layer_before);
+							lists:map(fun(Pid) -> network ! {finished, NewDeltas} end, State#neuron.layer_before);
 						hidden -> % compute Delta and send to previous layer
-							Delta = (State#neuron.activation*(1-State#neuron.activation))*
-									(lists:sum(lists:map(fun(Pid) ->
-															maps:get(Pid, State#neuron.thetas)*maps:get(Pid, State#neuron.deltas)
-									  					end,
-									  					State#neuron.layer_after))+State#neuron.bias_theta,
-							lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
-							bias ! {self(), Delta * State#neuron.bias_theta},
-							
-							NewDeltaMap = lists:foldl(fun(Pid, DeltaMap) -> 
-									case maps:find(Pid, NewDeltaMap) of 
-										{ok, V} -> maps:update(Pid, Delta + V, State#neuron.deltaMap);
-										error -> maps:put(Pid, Delta, State#neuron.deltaMap)
-									end 
-								end,
-								maps:new(),
-								LayerAfter),
-
-							State#neuron{deltaMap = NewDeltaMap, deltas = maps:new()}
+							% Delta = (State#neuron.activation*(1-State#neuron.activation))*
+							% 		lists:sum(lists:map(fun(Pid) ->
+							% 								maps:get(Pid, State#neuron.thetas)*maps:get(Pid, State#neuron.delta_collector)
+							% 		  					end,
+							% 		  					State#neuron.layer_after),
+							% lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
+							% collector ! {bias, self(), Delta*State#neuron.bias_theta},
+							% NewDeltas = lists:foldl(fun(Pid, AccumMap) -> 
+       %                                                  case maps:find(Pid, State#neuron.deltas) of 
+       %                                                      {ok, V} -> maps:update(Pid, Delta + V, AccumMap);
+							%                                 error -> maps:put(Pid, Delta, AccumMap)
+							% 		                    end
+					  %                               end,
+       %  								            State#neuron.deltas,
+					  %                               LayerAfter),
+							% State#neuron{deltas = NewDeltas, delta_collector = maps:new()}
 					end;
 				false -> % update deltas collected
 					State#neuron{deltas = NewDeltas}
 			end
 	end;
-update({give}, State) -> 
-	network ! {deltaMap, self(), State#neuron.ThetaMap, State#neuron.DeltaMap},
-	State;
-update({descend_gradient, NewThetas}, State) -> 
+update({descend_gradient, M}, State) ->
+    lists:map(fun(Pid) ->
+                 (1/M)*State#neuron.deltas
+              end,
+              State#neuron.layer_after)
+
+
 	State#neuron{thetas = NewThetas}, 
 	State;
 update(_Msg, State) ->
