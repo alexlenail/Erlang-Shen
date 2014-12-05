@@ -1,7 +1,7 @@
 -module (shen_network).
 
 %% API
--export ([start/3, train/2, test/2]).
+-export ([build/3, train/2, test/2]).
 
 
 %% ===================================================================
@@ -9,24 +9,18 @@
 %% ===================================================================
 
 % starts network specified by NumAttrs and HiddenLayers parameters
-start(NumAttrs, Classes, HiddenLayers) ->
-	erlang:display(start_neurons),
+build(NumAttrs, Classes, HiddenLayerDims) ->
 	% start input layer
-	{ok, InputLayer} = start_layer(NumAttrs),
-	erlang:display(InputLayer),
+	{ok, InputLayer} = start_layer(NumAttrs, input),
 	% start hidden layers
-	HiddenLayerPids = lists:map(fun(LayerSize) ->
-									{ok, LayerPids} = start_layer(LayerSize),
+	HiddenLayers = lists:map(fun(LayerSize) ->
+									{ok, LayerPids} = start_layer(LayerSize, hidden),
 									LayerPids
 								end,
-								HiddenLayers),
-	erlang:display(HiddenLayerPids),
+								HiddenLayerDims),
 	% start output layer
-	{ok, OutputLayer} = start_layer(1),
-	% connect layers forwards
-
-	% connect layers backwards
-
+	{ok, OutputLayer} = start_layer(1, output),
+	connect_layers(InputLayer, HiddenLayers, OutputLayer),
 	% return input layer so we can send it instances
 	InputLayer.
 
@@ -44,18 +38,41 @@ test(InputLayer, TestSet) ->
 %% ===================================================================
 
 % starts LayerSize neurons and returns a list of ther Pids
-start_layer(LayerSize) -> start_layer(LayerSize, []).
-start_layer(0, Pids) -> {ok, Pids};
-start_layer(LayerSize, Pids) ->
-	% start new neuron and link to supervisor
-	case shen_sup:start_child() of
+start_layer(LayerSize, Type) -> start_layer(LayerSize, Type, []).
+start_layer(0, Type, Pids) -> {ok, Pids};
+start_layer(LayerSize, Type, Pids) ->
+	% start new neuron with type and access to parent and link to supervisor
+	Args = {{network_pid, self()}, {neuron_type, Type}},
+	case shen_sup:start_child(Args) of
 		{error, Reason} -> {error, Reason};
 		{ok, ChildPid} ->
-			% gen_server:cast(ChildPid, Type). ??????
-			start_layer(LayerSize-1, [ChildPid | Pids])
+			start_layer(LayerSize-1, Type, [ChildPid | Pids])
 	end.
 
+connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
+	% connect layers forward
+	lists:foldl(fun(Layer, LayerBefore) ->
+					lists:map(fun(NeuronPid) ->
+								gen_server:cast(NeuronPid, {layer_before, LayerBefore})
+							  end,
+							  Layer),
+					Layer
+				end,
+				InputLayer,
+				lists:append([HiddenLayers, [OutputLayer]])),
+	% connect layers backwards
+	lists:foldr(fun(Layer, LayerAfter) ->
+					lists:map(fun(NeuronPid) ->
+								gen_server:cast(NeuronPid, {layer_after, LayerAfter})
+							  end,
+							  Layer),
+					Layer
+				end,
+				OutputLayer,
+				lists:append([[InputLayer], HiddenLayers])),
+	ok.
 
+% forward_back_once([], []) -> 
 
 
 

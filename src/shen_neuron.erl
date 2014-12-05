@@ -2,7 +2,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0]).
+-export([start_link/1]).
 
 %% Gen Server Callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -15,29 +15,32 @@
 %% API Functions
 %% ===================================================================
 
-start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+start_link(Args) ->
+    gen_server:start_link(?MODULE, Args, []).
 
 
 %% ===================================================================
 %% Gen Server Callbacks
 %% ===================================================================
 
-init(_Args) ->
+% maybe different records for different types
+-record(neuron, {network_pid, type, layer_before, layer_after,
+				 thetas}).
+
+init({{network_pid, NetworkPid}, {neuron_type, Type}}) ->
 	io:format("init neuron (~w)~n", [self()]),
 
 	% initial state of pid lists, thetas, deltas etc. initialized here
-	% random init of thetas
+	InitState = #neuron{network_pid = NetworkPid, type = Type},
+	erlang:display(InitState),
+    {ok, InitState}.
 
-	State = {},
-
-    {ok, State}.
+handle_cast(Msg, State) ->
+	NewState = update(Msg, State),
+    {noreply, NewState}.
 
 handle_call(_Request, _From, State) ->
     {reply, ok, State}.
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
 
 handle_info(_Info, State) ->
     {noreply, State}.
@@ -53,19 +56,26 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Functions
 %% ===================================================================
 
+% handle messages and update state record accordingly
+update({layer_before, LayerBefore}, State) ->
+	case State#neuron.type of
+		input -> InitThetas = undefined;
+		_Else ->
+			% randomly init thetas
+			Thetas = maps:new(),
+			lists:map(fun(Pid) ->
+						maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, Thetas)
+			  		  end,
+			  		  LayerBefore)
+	end,
+	State#neuron{layer_before = LayerBefore, thetas = Thetas};
+update({layer_after, LayerAfter}, State) ->
+	State#neuron{layer_after = LayerAfter};
+update(_Msg, State) ->
+    State.
 
 
 
-	% receive
-	% 	{NetworkPid, LayerBefore, LayerAfter} -> ok
-	% 	% LayerBefore and LayerAfter are PID lists. 
-	% end,
-
-	% % random initialization of Thetas
-	% ThetaMap = maps:new(),
-	% lists:map(fun(Pid) -> maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, ThetaMap) end, LayerBefore),
-
-	% outerLoop(LayerBefore, LayerAfter, ThetaMap, M).
 
 
 

@@ -19,7 +19,7 @@ run(TrainSet, TestSet, HiddenLayers) ->
 		{ok, {NumAttrs, Classes, TrainInstances}} ->
 			case shen_parse:arff(TestSet) of
 				{ok, {NumAttrs, Classes, TestInstances}} ->
-					InputLayer = shen_network:start(NumAttrs, Classes, HiddenLayers),
+					InputLayer = shen_network:build(NumAttrs, Classes, HiddenLayers),
 					shen_network:train(InputLayer, TrainInstances),
 					shen_network:test(InputLayer, TestInstances);
 				_TestDataError ->
