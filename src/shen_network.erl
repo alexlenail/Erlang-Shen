@@ -20,22 +20,20 @@ build(NumAttrs, Classes, HiddenLayerDims) ->
 								HiddenLayerDims),
 	% start output layer
 	{ok, OutputLayer} = start_layer(1, output),
+	% start bias accumulator process
+	start_bias(),
 	connect_layers(InputLayer, HiddenLayers, OutputLayer),
 	% return input layer so we can send it instances
 	InputLayer.
 
 train(InputLayer, TrainSet) ->
-	erlang:display(train),
+	% generate truly random numbers
+    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
+    random:seed(A, B, C),
 
 	% loop until convergence
-		% shuffle the training examples
-		% for each example
-			% map across inputlayer, send 1 feature to a node
-			% receive message from output layer that we are done with forward
-			% send output layer actual class
-			% receive messages from input layer saying they are done
-			
-
+		Shuffled = shuffle_instances(TrainSet),
+		lists:map(fun train_instance/1, Shuffled),
 	ok.
 
 test(InputLayer, TestSet) ->
@@ -57,6 +55,20 @@ start_layer(LayerSize, Type, Pids) ->
 		{error, Reason} -> {error, Reason};
 		{ok, ChildPid} ->
 			start_layer(LayerSize-1, Type, [ChildPid | Pids])
+	end.
+
+start_bias() ->
+	BiasPid = spawn(fun() -> bias_accum(maps:new()) end),
+	register(bias, BiasPid).
+
+bias_accum(BiasMap) ->
+	receive
+		{update, Pid, X} ->
+			case find(Pid, BiasMap) of
+				{ok, V} -> bias_accum(maps:put(Pid, V+X, BiasMap));
+				error -> bias_accum(maps:put(Pid, X, BiasMap))
+			end;
+		{return, Pid} -> Pid ! BiasMap, bias_accum(maps:new())
 	end.
 
 connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
@@ -82,58 +94,23 @@ connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 				lists:append([[InputLayer], HiddenLayers, [OutputLayer]])),
 	ok.
 
-% forward_back_once([], []) -> 
+% map across inputlayer, send 1 feature to a node
+% receive message from output layer that we are done with forward
+% send output layer actual class
+% receive messages from input layer saying they are done
+train_instance(Inst) ->
+	erlang:display(Inst).
 
+% shuffle list of data instances in random order
+shuffle_instances([]) -> [];
+shuffle_instances([X]) -> [X];
+shuffle_instances(Xs) -> shuffle_instances(Xs, length(Xs), []).
+shuffle_instances([], 0, Shuffled) -> Shuffled;
+shuffle_instances(Xs, Len, Shuffled) ->
+    {X, Rest} = nth_rest(random:uniform(Len), Xs),
+    shuffle_instances(Rest, Len - 1, [X | Shuffled]).
 
-
-	% Network = [[spawn(neuron, start, [length(TrainSet)]) || X <- lists:seq(Dimension)] || Dimension <- NetworkArchitecture],
-
-	% lists:foldl(fun(Layer, LayerAfter) -> lists:map(fun(Neuron) -> Neuron ! LayerAfter end), Layer end, [], Network),
-	% lists:foldr(fun(Layer, LayerBefore) -> lists:map(fun(Neuron) -> Neuron ! LayerBefore end), Layer end, Layer, Network).
-
-	% until convergence:
-
-	% 	send the fist layer of neurons the first input
-
-
-
-
-	% gradient descent loop, train network
-			% get training data
-			% test run and calculate accuracy
-
-
-% Network = [[spawn(neuron, start, []) || X <- lists:seq(Dimension)] || Dimension <- NetworkArchitecture],
-
-	% lists:foldl(fun(Layer, LayerAfter) -> lists:map(fun(Neuron) -> Neuron ! LayerAfter, Layer end, [], Network),
-	% lists:foldr(fun(Layer, LayerBefore) -> lists:map(fun(Neuron) -> Neuron ! LayerBefore, Layer end, Layer, Network).
-
-	% Make a first and last layer. 
-
-	% First Layer
-	% Find the dimensionality of the training data. 
-	% Send appropriate Pids. 
-
-	% Last layer
-	% Find the dimenionality of the labels. 
-	% Send the last hidden layer these Pids, and send these Pids the Layerbefore. 
-
-
-
-	% Make a first and last layer. 
-
-	% First Layer
-	% Find the dimensionality of the training data. 
-	% Send appropriate Pids. 
-
-	% Last layer
-	% Find the dimenionality of the labels. 
-	% Send the last hidden layer these Pids, and send these Pids the Layerbefore. 
-
-
-
-% learn
-    % send data to input layer
-
-
-% bias units?
+% pick a random element from list and return it and rest
+nth_rest(N, List) -> nth_rest(N, List, []).
+nth_rest(1, [E|List], Prefix) -> {E, Prefix ++ List};
+nth_rest(N, [E|List], Prefix) -> nth_rest(N - 1, List, [E|Prefix]).
