@@ -42,7 +42,7 @@ train({InputLayer, HiddenLayers, OutputLayer} TrainSet) ->
 	end,
 	% getting thetas and deltas from each neuron
 	lists:flatmap(fun(Pid) ->
-					gen_server:cast(Pid, {descend_gradient, length(TrainSet))
+					gen_server:cast(Pid, {descend_gradient, length(TrainSet), Bias})
 				  end,
 				  [InputLayer] ++ HiddenLayers ++ [OutputLayer]),
 
@@ -84,7 +84,7 @@ start_collector() ->
 	CollectorPid = spawn(fun() -> collector(maps:new(), maps:new(), maps:new()) end),
 	register(collector, CollectorPid).
 
-collector(BiasMap, Dij) ->
+collector(BiasMap) ->
 	receive
 		{bias, Pid, X} ->
 			case find(Pid, BiasMap) of
@@ -93,11 +93,7 @@ collector(BiasMap, Dij) ->
 			end;
 		{getAccumulatedError, M} -> 
 			network ! {accumulatedBiasErrorList, lists:map(fun({Pid, Bias}) -> {Pid, Bias/M} end, maps:to_list(BiasMap))}, 
-			bias_accum(maps:new(), Dij);
-		% {state, Pid, ThetaMap, DeltaMap} ->
-
-		% 	NewDij = maps:put(Pid, )
-		% 	Dij = maps:get(Pid, DeltaMap) / M + Lambda * maps:get(Pid) Thetas
+			bias_accum(maps:new());
 		stop -> ok
 	end.
 

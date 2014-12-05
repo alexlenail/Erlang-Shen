@@ -131,13 +131,24 @@ update({backprop, NextPid, D}, State) ->
 			end
 	end;
 update({descend_gradient, M}, State) ->
-    lists:map(fun(Pid) ->
-                 (1/M)*State#neuron.deltas
-              end,
-              State#neuron.layer_after)
+	Dij = lists:fold(fun(Pid, Map) ->
+			maps:put(Pid, (1/M)*maps:get(Pid, State#neuron.deltas) + LAMBDA*maps:get(Pid, State#neuron.thetas), Map)
+		end,
+		maps:new(),
+		State#neuron.layer_after),
 
+	NewThetas = lists:fold(fun(Pid, Map) -> 
+			maps:put(Pid, maps:get(Pid, State#neuron.thetas)-ALPHA*maps:get(Pid, Dij), Map)
+		end
+		maps:new(),
+		State#neuron.layer_after),
 
-	State#neuron{thetas = NewThetas}, 
+	collector ! {getAccumulatedError, M, self()},
+	receive
+		
+	end,
+
+	State#neuron{thetas = NewThetas, deltas = maps:new()}, 
 	State;
 update(_Msg, State) ->
     State.
