@@ -37,6 +37,25 @@ train(InputLayer, TrainSet) ->
 	% loop until convergence
 		Shuffled = shuffle_instances(TrainSet),
 		lists:map(fun train_instance/1, Shuffled),
+
+		bias ! {getAccumulatedError, M},
+		receive
+			{accumulatedBiasErrorList, BiasList} -> ok
+		end, 
+		lists:map(fun(Pid) -> gen_server:cast(Pid, {give, AccumulatorPid}) end, Network)
+		receive
+			{deltaMap, Pid, ThetaMap, DeltaMap} -> 
+				Dij = maps:get(Pid, DeltaMap) / M + Lambda * maps:get(Pid) Thetas
+		end,
+
+
+			% all the deltas from the net
+
+		% compute partial derivatives
+		% perform update
+		% send every neuron updated Thetas
+		% loop on train. 
+
 	ok.
 
 test(InputLayer, TestSet) ->
@@ -73,11 +92,12 @@ bias_accum(BiasMap) ->
 				{ok, V} -> bias_accum(maps:put(Pid, V+X, BiasMap));
 				error -> bias_accum(maps:put(Pid, X, BiasMap))
 			end;
-		{getAccumulatedError, Pid} -> Pid ! BiasMap, bias_accum(maps:new());
+		{getAccumulatedError, M} -> 
+			network ! {accumulatedBiasErrorList, lists:map(fun({Pid, Bias}) -> {Pid, Bias/M}, maps:to_list(BiasMap))}, 
+			bias_accum(maps:new());
 		stop -> ok
 	end.
 
-% we have bias, Now we need to figure out how to integrate it into computations
 
 % =====================================================
 
@@ -112,11 +132,11 @@ train_instance(InputLayer, Inst) ->
 	Label = stringToInt(lists:last(Inst)),
 	lists:map(fun(Pid, Feature) -> gen_server:cast(Pid, {forwardprop, Feature}) end, lists:zip(InputLayer, lists:droplast(Inst))
 	receive
-		{forwardprop, PrevPid, Prediction} -> PrevPid !  {backprop, Prediction - Label}
-
-
-
-	% erlang:display(Inst).
+		{forwardprop, PrevPid, Prediction} -> PrevPid ! {backprop, network, Prediction - Label}
+	end,
+	receive
+		{finished, NewDeltas} -> erlang:display(NewDeltas)
+	end.
 
 % shuffle list of data instances in random order
 shuffle_instances([]) -> [];

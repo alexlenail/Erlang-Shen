@@ -28,7 +28,7 @@ start_link(Args) ->
 
 init({{network_pid, NetworkPid}, {neuron_type, Type}}) ->
 	io:format("init neuron (~w)~n", [self()]),
-	InitState = #neuron{network_pid = NetworkPid, type = Type, deltas = maps:new()},
+	InitState = #neuron{network_pid = NetworkPid, type = Type, deltas = maps:new()}, % DeltaMao
 	erlang:display(InitState),
     {ok, InitState}.
 
@@ -106,7 +106,7 @@ update({backprop, NextPid, D}, State) ->
 				true -> % if we have all the delta terms
 					case State#neuron.type of
 						input -> % tell network we have finished training on this instance
-							lists:map(fun(Pid) -> gen_server:cast(Pid, finished) end, State#neuron.layer_before);
+							lists:map(fun(Pid) -> network ! {finished, NewDeltas}) end, State#neuron.layer_before);
 						hidden -> % compute Delta and send to previous layer
 							Delta = (State#neuron.activation*(1-State#neuron.activation))*
 									(lists:sum(lists:map(fun(Pid) ->
@@ -115,16 +115,28 @@ update({backprop, NextPid, D}, State) ->
 									  					State#neuron.layer_after))+State#neuron.bias_theta,
 							lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
 							bias ! {self(), Delta * State#neuron.bias_theta},
-							State#neuron{delta = State#neuron.delta + Delta, deltas = maps:new()}
+							
+							NewDeltaMap = lists:foldl(fun(Pid, DeltaMap) -> 
+									case maps:find(Pid, NewDeltaMap) of 
+										{ok, V} -> maps:update(Pid, Delta + V, State#neuron.deltaMap);
+										error -> maps:put(Pid, Delta, State#neuron.deltaMap)
+									end 
+								end,
+								maps:new(),
+								LayerAfter),
+
+							State#neuron{deltaMap = NewDeltaMap, deltas = maps:new()}
 					end;
 				false -> % update deltas collected
 					State#neuron{deltas = NewDeltas}
 			end
 	end;
-update({descend_gradient, NewThetas}) -> 
-	State#neuron{thetas = NewThetas};
-
-
+update({give}, State) -> 
+	network ! {deltaMap, self(), State#neuron.ThetaMap, State#neuron.DeltaMap},
+	State;
+update({descend_gradient, NewThetas}, State) -> 
+	State#neuron{thetas = NewThetas}, 
+	State;
 update(_Msg, State) ->
     State.
 
