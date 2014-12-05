@@ -54,47 +54,52 @@ outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->
 
 	outerLoop(NewThetaMap).
 
+	% send messages to first layer. 
+	% receive from last layer. 
+	% send actual to last layer. 
+	% make sure backprop stops for first layer. 
+
 
 loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M) ->
 	receive
-		{Pid, Activation} when lists:member(Pid, LayerBefore) ->
-			maps:put(Pid, Activation, ActivationMap),
-			if maps:size() =:= length(LayerBefore) ->
-				forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap),
-				loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), DeltaMap), Accumulator, M;
-			true ->
-				loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
-			end;
-		{Pid, Delta} when member(Pid, LayerAfter) ->
-			maps:put(Pid, Delta, DeltaMap),
-			case maps:size(DeltaMap) of
-				length(LayerAfter) ->
-					NewAccumulator = backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator),
-					if M > 1 ->
-						loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, maps:new(), NewAccumulator, M-1);
-					M =:= 1 -> NewAccumulator
-					end;
-				_ -> loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
+		{Pid, Data} ->
+			case lists:member(Pid, LayerBefore) of
+				true -> member_layer;
+				false ->
+					case lists:member(Pid, LayerAfter) of
+						true -> member_layerafter;
+						false -> error
+					end
 			end
+		{Pid, input, Input}
 	end.
 
 
-	% 	{Pid, Data} ->
-	% 		case lists:member(Pid, LayerBefore) of
-	% 			true -> member_layer;
-	% 			false ->
-	% 				case lists:member(Pid, LayerAfter) of
-	% 					true -> member_layerafter;
-	% 					false -> error
-	% 				end
-	% 		end
-	% 	{Pid, input, Input}
-	% end.
 
 	% ****************** Needed to put in case statements because we can't evaluate expressions in if *************
 	% Might want to move the logic below into separate functions for forward and backprop
 
 
+	% 	{Pid, Activation} when lists:member(Pid, LayerBefore) ->
+	% 		maps:put(Pid, Activation, ActivationMap),
+	% 		if maps:size() =:= length(LayerBefore) ->
+	% 			forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap),
+	% 			loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), DeltaMap), Accumulator, M;
+	% 		true ->
+	% 			loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
+	% 		end;
+	% 	{Pid, Delta} when member(Pid, LayerAfter) ->
+	% 		maps:put(Pid, Delta, DeltaMap),
+	% 		case maps:size(DeltaMap) of
+	% 			length(LayerAfter) ->
+	% 				NewAccumulator = backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator),
+	% 				if M > 1 ->
+	% 					loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, maps:new(), NewAccumulator, M-1);
+	% 				M =:= 1 -> NewAccumulator
+	% 				end;
+	% 			_ -> loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
+	% 		end
+	% end.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -110,7 +115,7 @@ g(Z) -> 1/(1+math:exp(-Z)).
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator) -> 
-																			%this logic is probably broken: thetamap needs to be of LayerAfter but it's of LayerBefore. 
+	
 	Error = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, DeltaMap) * maps:get(Pid, ThetaMap) end, LayerAfter)),
 	Delta = Activation * (1- Activation) * Error,
 
