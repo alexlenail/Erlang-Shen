@@ -94,7 +94,8 @@ update({backprop, NextPid, D}, State) ->
 	case State#neuron.type of
 		output -> % get difference from actual class and send to previous layer
 			Delta = State#neuron.activation - D,
-			lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before);
+			lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
+			bias ! {self(), Delta * State#neuron.bias_theta};
 		_Else ->
 			% collect deltas from layer after
 			NewDeltas = maps:put(NextPid, D, State#neuron.deltas),
@@ -110,6 +111,7 @@ update({backprop, NextPid, D}, State) ->
 									  					end,
 									  					State#neuron.layer_after))+State#neuron.bias_theta,
 							lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
+							bias ! {self(), Delta * State#neuron.bias_theta},
 							State#neuron{delta = State#neuron.delta + Delta, deltas = maps:new()}
 					end;
 				false -> % update deltas collected

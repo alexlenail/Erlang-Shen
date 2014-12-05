@@ -57,6 +57,8 @@ start_layer(LayerSize, Type, Pids) ->
 			start_layer(LayerSize-1, Type, [ChildPid | Pids])
 	end.
 
+% =====================================================
+
 start_bias() ->
 	BiasPid = spawn(fun() -> bias_accum(maps:new()) end),
 	register(bias, BiasPid).
@@ -68,8 +70,12 @@ bias_accum(BiasMap) ->
 				{ok, V} -> bias_accum(maps:put(Pid, V+X, BiasMap));
 				error -> bias_accum(maps:put(Pid, X, BiasMap))
 			end;
-		{return, Pid} -> Pid ! BiasMap, bias_accum(maps:new())
+		{getAccumulatedError, Pid} -> Pid ! BiasMap, bias_accum(maps:new())
 	end.
+
+% we have bias, Now we need to figure out how to integrate it into computations
+
+% =====================================================
 
 connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 	% connect layers forward
