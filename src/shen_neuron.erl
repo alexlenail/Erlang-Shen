@@ -88,25 +88,26 @@ update({forwardprop, X}, State) ->
 	end;
 update({backprop, NextPid, D}, State) ->
 	case State#neuron.type of
-		output ->
+		output -> % get difference from actual class and send to previous layer
 			Delta = State#neuron.activation - D,
-			lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
+			lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before);
 		_Else ->
 			% collect deltas from layer after
 			NewDeltas = maps:put(NextPid, D, State#neuron.deltas),
 			case maps:size(NewDeltas) =:= length(State#neuron.layer_after) of
-				true -> % if we have all the delta terms, calculate Delta term and send to previous layer
+				true -> % if we have all the delta terms
 					case State#neuron.type of
 						input -> % tell network we have finished training on this instance
-							lists:map(fun(Pid) -> gen_server:cast(Pid, finished), State#neuron.layer_before);
-						hidden -> % 
+							lists:map(fun(Pid) -> gen_server:cast(Pid, finished) end, State#neuron.layer_before);
+						hidden -> % compute Delta and send to previous layer
 							Delta = (State#neuron.activation*(1-State#neuron.activation))*
 									lists:sum(lists:map(fun(Pid) ->
 															maps:get(Pid, State#neuron.thetas)*maps:get(Pid, State#neuron.deltas)
 									  					end,
 									  					State#neuron.layer_after)),
 							lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
-							State#neuron{delta = State#neuron.delta + Delta, deltas = maps:new()};
+							State#neuron{delta = State#neuron.delta + Delta, deltas = maps:new()}
+					end;
 				false -> % update deltas collected
 					State#neuron{deltas = NewDeltas}
 			end

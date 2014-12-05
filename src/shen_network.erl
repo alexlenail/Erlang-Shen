@@ -31,7 +31,10 @@ train(InputLayer, TrainSet) ->
 		% shuffle the training examples
 		% for each example
 			% map across inputlayer, send 1 feature to a node
-			% send label to output layer with backprop message
+			% receive message from output layer that we are done with forward
+			% send output layer actual class
+			% receive messages from input layer saying they are done
+			
 
 	ok.
 
