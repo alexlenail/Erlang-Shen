@@ -10,6 +10,9 @@
 
 % starts network specified by NumAttrs and HiddenLayers parameters
 build(NumAttrs, Classes, HiddenLayerDims) ->
+	% this solved a bunch of issues. 
+	register(self(), network),
+
 	% start input layer
 	{ok, InputLayer} = start_layer(NumAttrs, input),
 	% start hidden layers
@@ -70,7 +73,8 @@ bias_accum(BiasMap) ->
 				{ok, V} -> bias_accum(maps:put(Pid, V+X, BiasMap));
 				error -> bias_accum(maps:put(Pid, X, BiasMap))
 			end;
-		{getAccumulatedError, Pid} -> Pid ! BiasMap, bias_accum(maps:new())
+		{getAccumulatedError, Pid} -> Pid ! BiasMap, bias_accum(maps:new());
+		stop -> ok
 	end.
 
 % we have bias, Now we need to figure out how to integrate it into computations
@@ -104,8 +108,15 @@ connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 % receive message from output layer that we are done with forward
 % send output layer actual class
 % receive messages from input layer saying they are done
-train_instance(Inst) ->
-	erlang:display(Inst).
+train_instance(InputLayer, Inst) ->
+	Label = stringToInt(lists:last(Inst)),
+	lists:map(fun(Pid, Feature) -> gen_server:cast(Pid, {forwardprop, Feature}) end, lists:zip(InputLayer, lists:droplast(Inst))
+	receive
+		{forwardprop, PrevPid, Prediction} -> PrevPid !  {backprop, Prediction - Label}
+
+
+
+	% erlang:display(Inst).
 
 % shuffle list of data instances in random order
 shuffle_instances([]) -> [];

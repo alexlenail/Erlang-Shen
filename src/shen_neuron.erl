@@ -73,7 +73,7 @@ update({layer_after, LayerAfter}, State) ->
 			Thetas = random_init_thetas(LayerAfter)
 	end,
 	State#neuron{layer_after = LayerAfter, thetas = Thetas, bias_theta = BiasTheta};
-update({forwardprop, X}, State) ->
+update({forwardprop, PrevPid, X}, State) ->
 	% collect inputs from layer before
 	NewInputs = [X | State#neuron.inputs],
 	case length(NewInputs) =:= length(State#neuron.layer_before) of
@@ -83,9 +83,12 @@ update({forwardprop, X}, State) ->
 				_Else -> Activation	= g(lists:sum(NewInputs)+State#neuron.bias_theta)
 			end,
 			lists:map(fun(Pid) ->
-						gen_server:cast(Pid, {forwardprop, maps:get(Pid, State#neuron.thetas)*Activation})
-					  end,
-					  State#neuron.layer_after),
+						case State#neuron.type of 
+							output -> network ! {forwardprop, maps:get(Pid, State#neuron.thetas)*Activation}
+							_Else -> gen_server:cast(Pid, {forwardprop, maps:get(Pid, State#neuron.thetas)*Activation})
+						end,
+					end,
+					State#neuron.layer_after),
 			State#neuron{inputs = [], activation = Activation};
 		false -> % update inputs collected
 			State#neuron{inputs = NewInputs}
@@ -118,6 +121,10 @@ update({backprop, NextPid, D}, State) ->
 					State#neuron{deltas = NewDeltas}
 			end
 	end;
+update({descend_gradient, NewThetas}) -> 
+	State#neuron{thetas = NewThetas};
+
+
 update(_Msg, State) ->
     State.
 
