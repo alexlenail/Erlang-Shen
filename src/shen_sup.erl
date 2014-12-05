@@ -1,44 +1,38 @@
 -module(shen_sup).
-
 -behaviour(supervisor).
 
 %% API
--export([start_link/0]).
+-export([start_link/0, start_child/1]).
 
-%% Supervisor callbacks
+%% Supervisor Callbacks
 -export([init/1]).
 
 -define(SERVER, ?MODULE).
 
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
-
-
 %% ===================================================================
-%% API functions
+%% API Functions
 %% ===================================================================
 
 start_link() ->
     supervisor:start_link({local, ?SERVER}, ?MODULE, []).
 
+start_child(Args) ->
+    supervisor:start_child(?MODULE, [Args]).
+
 
 %% ===================================================================
-%% Supervisor callbacks
+%% Supervisor Callbacks
 %% ===================================================================
 
-init([]) ->
-    RestartStrategy = one_for_one,
+init(_Args) ->
+    %%%%%%% REFINE THESE PARAMETERS %%%%%%%
+    RestartStrategy = simple_one_for_one,
     MaxRestarts = 1000,
     MaxSecondsBetweenRestarts = 3600,
-
     SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
-
     Restart = permanent,
-    Shutdown = 2000,
+    Shutdown = brutal_kill, % 2000,
     Type = worker,
-
-    AChild = {'AName', {'AModule', start_link, []},
-              Restart, Shutdown, Type, ['AModule']},
-
+    AChild = {shen_neuron, {shen_neuron, start_link, []},
+               Restart, Shutdown, Type, [shen_neuron]},
     {ok, {SupFlags, [AChild]}}.
-    % probably change to one_for_all so we can end the program if anything dies

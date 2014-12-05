@@ -1,58 +1,112 @@
 -module(shen_neuron).
+-behaviour(gen_server).
 
--behaviour(application).
+%% API
+-export([start_link/1]).
 
-%% Application callbacks
--export([start/2, stop/1]).
-
-
-%% ===================================================================
-%% Application callbacks
-%% ===================================================================
+%% Gen Server Callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
 
 -define(INIT_EPSILON, 0.0001).
 
-start(_StartType, [M]) ->
-	shen_neuron_sup:start_link(),
-	receive
-		{NetworkPid, LayerBefore, LayerAfter} -> ok
-		% LayerBefore and LayerAfter are PID lists. 
-	end,
 
-	% random initialization of Thetas
-	ThetaMap = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, ThetaMap) end, LayerBefore),
+%% ===================================================================
+%% API Functions
+%% ===================================================================
 
-	outerLoop(LayerBefore, LayerAfter, ThetaMap, M).
+start_link(Args) ->
+    gen_server:start_link(?MODULE, Args, []).
 
-stop(_State) ->
+
+%% ===================================================================
+%% Gen Server Callbacks
+%% ===================================================================
+
+% maybe different records for different types
+-record(neuron, {network_pid, type, layer_before, layer_after,
+				 thetas}).
+
+init({{network_pid, NetworkPid}, {neuron_type, Type}}) ->
+	io:format("init neuron (~w)~n", [self()]),
+	InitState = #neuron{network_pid = NetworkPid, type = Type},
+	erlang:display(InitState),
+    {ok, InitState}.
+
+handle_cast(Msg, State) ->
+	NewState = update(Msg, State),
+    erlang:display(NewState),
+    {noreply, NewState}.
+
+handle_call(_Request, _From, State) ->
+    {reply, ok, State}.
+
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+terminate(_Reason, _State) ->
     ok.
 
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
 
 %% ===================================================================
-%% Internal functions
+%% Internal Functions
 %% ===================================================================
 
-outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->
+% handle messages and update state record accordingly
+update({layer_before, LayerBefore}, State) ->
+	case State#neuron.type of
+		input -> Thetas = undefined;
+		_Else ->
+			Thetas = random_init_thetas(LayerBefore)
+	end,
+	State#neuron{layer_before = LayerBefore, thetas = Thetas};
+update({layer_after, LayerAfter}, State) ->
+	State#neuron{layer_after = LayerAfter};
+update({forwardprop, X}, State) ->
+	% case
+	State;
+update({backprop, X}, State) ->
+	State;
+update(_Msg, State) ->
+    State.
 
-	% Initialize the Accumulator, accumulates error
-	Accumulator = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, 0, Accumulator) end, LayerAfter),
+% returns map of random initial theta value for each Pid in LayerBefore as a key
+random_init_thetas(LayerBefore) -> 
+    lists:foldr(fun(Pid, AccumMap) ->
+                    % generate a truly random number
+                    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
+                    random:seed(A, B, C),
+                    maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, AccumMap)
+                end,
+                maps:new(),
+                LayerBefore).
 
-	% One iteration of training
-	Accumulated = loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator, M),
 
-	% Compute Partial Derivatives
-	DMap = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, (1/M) * maps:get(Pid, Accumulated) + Lambda * maps:get(Pid, ThetaMap), DMap) end, LayerAfter),
-	maps:put(Bias, (1/M) * maps:get(Pid, Accumulated), DMap),
 
-	% Update Weights
-	NewThetaMap = maps:new(),
-	lists:map(fun(Pid) -> maps:put(Pid, maps:get(Pid, ThetaMap) - Alpha * maps:get(Pid, DMap), NewThetaMap) end, LayerBefore),
-	maps:put(Bias, maps:get(Bias, ThetaMap) - Alpha * maps:get(Bias, DMap), NewThetaMap),
 
-	outerLoop(NewThetaMap).
+% outerLoop(LayerBefore, LayerAfter, ThetaMap, M) -> ok.
+
+	% % Initialize the Accumulator, accumulates error
+	% Accumulator = maps:new(),
+	% lists:map(fun(Pid) -> maps:put(Pid, 0, Accumulator) end, LayerAfter),
+
+	% % One iteration of training
+	% Accumulated = loop(LayerBefore, LayerAfter, ThetaMap, maps:new(), maps:new(), Accumulator, M),
+
+	% % Compute Partial Derivatives
+	% DMap = maps:new(),
+	% lists:map(fun(Pid) -> maps:put(Pid, (1/M) * maps:get(Pid, Accumulated) + Lambda * maps:get(Pid, ThetaMap), DMap) end, LayerAfter),
+	% maps:put(Bias, (1/M) * maps:get(Pid, Accumulated), DMap),
+
+	% % Update Weights
+	% NewThetaMap = maps:new(),
+	% lists:map(fun(Pid) -> maps:put(Pid, maps:get(Pid, ThetaMap) - Alpha * maps:get(Pid, DMap), NewThetaMap) end, LayerBefore),
+	% maps:put(Bias, maps:get(Bias, ThetaMap) - Alpha * maps:get(Bias, DMap), NewThetaMap),
+
+	% outerLoop(NewThetaMap).
 
 	% send messages to first layer. 
 	% receive from last layer. 
@@ -60,19 +114,19 @@ outerLoop(LayerBefore, LayerAfter, ThetaMap, M) ->
 	% make sure backprop stops for first layer. 
 
 
-loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M) ->
-	receive
-		{Pid, Data} ->
-			case lists:member(Pid, LayerBefore) of
-				true -> member_layer;
-				false ->
-					case lists:member(Pid, LayerAfter) of
-						true -> member_layerafter;
-						false -> error
-					end
-			end
-		{Pid, input, Input}
-	end.
+% loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M) -> ok.
+	% receive
+	% 	{Pid, Data} ->
+	% 		case lists:member(Pid, LayerBefore) of
+	% 			true -> member_layer;
+	% 			false ->
+	% 				case lists:member(Pid, LayerAfter) of
+	% 					true -> member_layerafter;
+	% 					false -> error
+	% 				end
+	% 		end
+	% 	{Pid, input, Input}
+	% end.
 
 
 
@@ -103,35 +157,33 @@ loop(LayerBefore, LayerAfter, ThetaMap, ActivationMap, DeltaMap, Accumulator, M)
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap) ->
-	LinearCombination = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, ActivationMap) * maps:get(Pid, ThetaMap) end, LayerBefore)),
-	Activation = g(LinearCombination + maps:get(Bias, ThetaMap)),
-	lists:map(fun(Pid) -> Pid ! {self(), Activation} end, LayerAfter),
-	Activation. 
+% forward(LayerBefore, LayerAfter, ActivationMap, ThetaMap) -> ok.
+	% LinearCombination = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, ActivationMap) * maps:get(Pid, ThetaMap) end, LayerBefore)),
+	% Activation = g(LinearCombination + maps:get(Bias, ThetaMap)),
+	% lists:map(fun(Pid) -> Pid ! {self(), Activation} end, LayerAfter),
+	% Activation. 
 
 
-g(Z) -> 1/(1+math:exp(-Z)).
+% g(Z) -> 1/(1+math:exp(-Z)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator) -> 
+% backprop(LayerBefore, LayerAfter, DeltaMap, ThetaMap, Accumulator) -> ok.
 	
-	Error = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, DeltaMap) * maps:get(Pid, ThetaMap) end, LayerAfter)),
-	Delta = Activation * (1- Activation) * Error,
+	% Error = lists:sum(lists:map(fun(Pid) -> maps:get(Pid, DeltaMap) * maps:get(Pid, ThetaMap) end, LayerAfter)),
+	% Delta = Activation * (1- Activation) * Error,
 
-	lists:map(fun(Pid) -> 
-				Change = Activation * maps:get(Pid, DeltaMap),
-				maps:put(Pid, maps:get(Pid, Accumulator) + Change, Accumulator)
-			end,
-		LayerAfter),
+	% lists:map(fun(Pid) -> 
+	% 			Change = Activation * maps:get(Pid, DeltaMap),
+	% 			maps:put(Pid, maps:get(Pid, Accumulator) + Change, Accumulator)
+	% 		end,
+	% 	LayerAfter),
 
-	lists:map(fun(Pid) -> Pid ! {self(), Delta} end, LayerBefore), 
+	% lists:map(fun(Pid) -> Pid ! {self(), Delta} end, LayerBefore), 
 
-	Accumulator.
+	% Accumulator.
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 % gradient checking?
-
-

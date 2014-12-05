@@ -12,6 +12,8 @@
 
 `?> application:start(shen).`
 
+`?> shen:run(TestSet, TrainSet, HiddenLayers).`
+
 ---------------------------------
 
 Deep learning is an emerging approach at machine learning which re-implements and extends neural networks, an older category of algorithms that have only recently been found to shine particularly brightly in the context of rapidly growing amounts of computational power and data. Deep learning is a massively parallelizable process, so much so that it is traditionally implemented on Graphical Processing Units (GPUs), though it doesn’t need to be. Deep learning algorithms have especially been exploited in two application spaces in industry: image and language recognition. These are particularly apt problem spaces for neural networks because they perform feature selection and feature representation independently of human input, which is to say, they learn to understand language better than we can describe it to them, in much the same way a baby might learn language as a result of being repeatedly exposed to it. 
