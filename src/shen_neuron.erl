@@ -23,9 +23,8 @@ start_link(Args) ->
 %% Gen Server Callbacks
 %% ===================================================================
 
-% maybe different records for different types
 -record(neuron, {network_pid, type, layer_before, layer_after,
-				 thetas}).
+				 inputs = [], activation, thetas, delta = 0}).
 
 init({{network_pid, NetworkPid}, {neuron_type, Type}}) ->
 	io:format("init neuron (~w)~n", [self()]),
@@ -33,6 +32,7 @@ init({{network_pid, NetworkPid}, {neuron_type, Type}}) ->
 	erlang:display(InitState),
     {ok, InitState}.
 
+% asynchronous messages
 handle_cast(Msg, State) ->
 	NewState = update(Msg, State),
     erlang:display(NewState),
@@ -55,20 +55,42 @@ code_change(_OldVsn, State, _Extra) ->
 %% Internal Functions
 %% ===================================================================
 
+% this f
+g(Z) -> 1/(1+math:exp(-Z)).
+
 % handle messages and update state record accordingly
 update({layer_before, LayerBefore}, State) ->
-	case State#neuron.type of
-		input -> Thetas = undefined;
-		_Else ->
-			Thetas = random_init_thetas(LayerBefore)
-	end,
-	State#neuron{layer_before = LayerBefore, thetas = Thetas};
+	State#neuron{layer_before = LayerBefore};
 update({layer_after, LayerAfter}, State) ->
-	State#neuron{layer_after = LayerAfter};
+	case State#neuron.type of
+		output ->
+			Thetas = undefined;
+		_Else -> 
+			Thetas = random_init_thetas(LayerAfter)
+	end,
+	State#neuron{layer_after = LayerAfter, thetas = Thetas};
 update({forwardprop, X}, State) ->
-	% case
-	State;
+	% collect inputs from layer before
+	NewInputs = [X | State#neuron.inputs],
+	case length(NewInputs) =:= length(State#neuron.layer_before) of
+		true -> % if we have all the inputs, calculate activation and send to next layer
+			case State#neuron.type of
+				input -> Activation = lists:sum(NewInputs);
+				_Else -> Activation	= g(lists:sum(NewInputs))
+			end,
+			lists:map(fun({Pid, Theta}) ->
+						gen_server:cast(Pid, {forwardprop, Theta*Activation})
+					  end,
+					  lists:zip(State#neuron.layer_after, State#neuron.thetas)),
+			State#neuron{inputs = [], activation = Activation};
+		false -> % update inputs collected
+			State#neuron{inputs = NewInputs}
+	end;
 update({backprop, X}, State) ->
+	case State#neuron.type of
+		input -> ok;
+		hidden -> ok
+	end,
 	State;
 update(_Msg, State) ->
     State.
@@ -164,7 +186,6 @@ random_init_thetas(LayerBefore) ->
 	% Activation. 
 
 
-% g(Z) -> 1/(1+math:exp(-Z)).
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

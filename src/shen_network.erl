@@ -26,6 +26,13 @@ build(NumAttrs, Classes, HiddenLayerDims) ->
 
 train(InputLayer, TrainSet) ->
 	erlang:display(train),
+
+	% loop until convergence
+		% shuffle the training examples
+		% for each example
+			% map across inputlayer, send 1 feature to a node
+			% send label to output layer with backprop message
+
 	ok.
 
 test(InputLayer, TestSet) ->
@@ -58,8 +65,8 @@ connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 							  Layer),
 					Layer
 				end,
-				InputLayer,
-				lists:append([HiddenLayers, [OutputLayer]])),
+				[self()], % connect network to the input layer
+				lists:append([[InputLayer], HiddenLayers, [OutputLayer]])),
 	% connect layers backwards
 	lists:foldr(fun(Layer, LayerAfter) ->
 					lists:map(fun(NeuronPid) ->
