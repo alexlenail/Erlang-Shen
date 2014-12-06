@@ -10,12 +10,14 @@
 
 % starts network specified by NumAttrs and HiddenLayers parameters
 build(NumAttrs, _Classes, HiddenLayerDims) ->
-	register(self(), network),
+	register(?MODULE, self()),
 	% start input layer
 	{ok, InputLayer} = start_layer(NumAttrs, input),
 	% start hidden layers
 	HiddenLayers = lists:map(fun(LayerSize) ->
+									erlang:display(start_layer),
 									{ok, LayerPids} = start_layer(LayerSize, hidden),
+									erlang:display(LayerPids),
 									LayerPids
 								end,
 								HiddenLayerDims),
@@ -38,10 +40,10 @@ train(NumGradientSteps, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestS
 	lists:map(fun(Inst) -> train_instance(InputLayer, Inst) end, Shuffled),
 
 	% getting thetas and deltas from each neuron
-	lists:flatmap(fun(Pid) ->
+	lists:map(fun(Pid) ->
 					gen_server:cast(Pid, {descend_gradient, length(TrainSet)})
 				  end,
-				  [InputLayer] ++ HiddenLayers ++ [OutputLayer]),
+				  InputLayer ++ lists:flatten(HiddenLayers) ++ OutputLayer),
 
 	test(InputLayer, TestSet),
 
@@ -61,9 +63,8 @@ test(InputLayer, TestSet) ->
 start_layer(LayerSize, Type) -> start_layer(LayerSize, Type, []).
 start_layer(0, _Type, Pids) -> {ok, Pids};
 start_layer(LayerSize, Type, Pids) ->
-	% start new neuron with type and access to parent and link to supervisor
-	Args = {{network_pid, self()}, {neuron_type, Type}},
-	case shen_sup:start_child(Args) of
+	% start new neuron with type
+	case shen_sup:start_child({neuron_type, Type}) of
 		{error, Reason} -> {error, Reason};
 		{ok, ChildPid} ->
 			start_layer(LayerSize-1, Type, [ChildPid | Pids])
@@ -125,7 +126,8 @@ train_instance(InputLayer, Inst) ->
 	% receive message from output layer that we are done with forward
 	receive
 		{forwardprop, OutputPid, _Prediction} -> % send output layer actual class
-			OutputPid ! {backprop, network, Label}
+			erlang:display({network_pred, _Prediction}),
+			gen_server:cast(OutputPid, {backprop, network, Label})
 	end,
 	% receive messages from input layer saying netowrk is done with this instance
 	train_instance_receive_end(length(InputLayer)).
@@ -133,7 +135,7 @@ train_instance(InputLayer, Inst) ->
 train_instance_receive_end(0) -> ok;
 train_instance_receive_end(N) ->
 	receive
-		{finished, NewDeltas} -> erlang:display(NewDeltas), train_instance_receive_end(N-1)
+		{finished, NewDeltas} -> erlang:display({N, NewDeltas}), train_instance_receive_end(N-1)
 	end.
 
 % shuffle list of data instances in random order
