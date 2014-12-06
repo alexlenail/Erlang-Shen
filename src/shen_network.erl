@@ -3,8 +3,6 @@
 %% API
 -export ([build/3, train/2, test/2]).
 
--define(LAMBDA, .0005).
-
 
 %% ===================================================================
 %% API Functions
@@ -28,7 +26,10 @@ build(NumAttrs, Classes, HiddenLayerDims) ->
 	connect_layers(InputLayer, HiddenLayers, OutputLayer),
 	{InputLayer, HiddenLayers, OutputLayer}.
 
-train({InputLayer, HiddenLayers, OutputLayer} TrainSet) ->
+train(0, _, _) -> collector ! stop;
+train(NumGradientSteps, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestSet) ->
+	collector ! refresh,
+
 	% generate truly random numbers
     <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
     random:seed(A, B, C),
@@ -36,29 +37,19 @@ train({InputLayer, HiddenLayers, OutputLayer} TrainSet) ->
 	Shuffled = shuffle_instances(TrainSet),
 	lists:map(fun train_instance/1, Shuffled),
 
-	collector ! {getAccumulatedError, length(TrainSet)},
-	receive
-		{accumulatedBiasErrorList, BiasList} -> ok
-	end,
 	% getting thetas and deltas from each neuron
 	lists:flatmap(fun(Pid) ->
 					gen_server:cast(Pid, {descend_gradient, length(TrainSet), Bias})
 				  end,
 				  [InputLayer] ++ HiddenLayers ++ [OutputLayer]),
 
+	test(InputLayer, TestSet),
 
-
-			% all the deltas from the net
-
-		% compute partial derivatives
-		% perform update
-		% send every neuron updated Thetas
-		% loop on train. 
-
-	ok.
+	train(NumGradientSteps-1, {InputLayer, HiddenLayers, OutputLayer}, TrainSet).
 
 test(InputLayer, TestSet) ->
-	erlang:display(test),
+	Error = lists:sum(lists:map(fun test_instance/1, TestSet))/length(TestSet) * 100,
+	io:format("~i%~n", [Error]),
 	ok.
 
 
@@ -81,19 +72,20 @@ start_layer(LayerSize, Type, Pids) ->
 % =====================================================
 
 start_collector() ->
-	CollectorPid = spawn(fun() -> collector(maps:new(), maps:new(), maps:new()) end),
+	CollectorPid = spawn(fun() -> collector(maps:new()) end),
 	register(collector, CollectorPid).
 
 collector(BiasMap) ->
 	receive
 		{bias, Pid, X} ->
 			case find(Pid, BiasMap) of
-				{ok, V} -> bias_accum(maps:put(Pid, V+X, BiasMap), Dij);
-				error -> bias_accum(maps:put(Pid, X, BiasMap), Dij)
+				{ok, V} -> collector(maps:put(Pid, V+X, BiasMap));
+				error -> collector(maps:put(Pid, X, BiasMap))
 			end;
-		{getAccumulatedError, M} -> 
-			network ! {accumulatedBiasErrorList, lists:map(fun({Pid, Bias}) -> {Pid, Bias/M} end, maps:to_list(BiasMap))}, 
-			bias_accum(maps:new());
+		{getAccumulatedError, M, Pid} ->
+			gen_server:cast(Pid, maps:get(Pid, BiasMap)),
+			collector(BiasMap)
+		refresh -> collector(maps:new());
 		stop -> ok
 	end.
 
@@ -157,3 +149,15 @@ shuffle_instances(Xs, Len, Shuffled) ->
 nth_rest(N, List) -> nth_rest(N, List, []).
 nth_rest(1, [E|List], Prefix) -> {E, Prefix ++ List};
 nth_rest(N, [E|List], Prefix) -> nth_rest(N - 1, List, [E|Prefix]).
+
+test_instance(InputLayer, Inst) ->
+	Label = lists:last(Inst),
+	% map across inputlayer, send 1 feature to a node
+	lists:map(fun({Pid, Attr}) ->
+				gen_server:cast(Pid, {forwardprop, network, Attr})
+			  end,
+			  lists:zip(InputLayer, lists:droplast(Inst)),
+	% receive message from output layer that we are done with forward
+	receive
+		{forwardprop, OutputPid, Prediction} -> Label-Prediction
+	end,
