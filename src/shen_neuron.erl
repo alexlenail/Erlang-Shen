@@ -9,8 +9,8 @@
          terminate/2, code_change/3]).
 
 -define(INIT_EPSILON, 0.0001).
--define(LAMBDA, .0005).
--define(ALPHA, .1).
+-define(LAMBDA, 0.0005).
+-define(ALPHA, 0.1).
 
 
 %% ===================================================================
@@ -115,7 +115,7 @@ update({backprop, NextPid, D}, State) ->
 									lists:sum(lists:map(fun(Pid) ->
 															maps:get(Pid, State#neuron.thetas)*maps:get(Pid, State#neuron.delta_collector)
 									  					end,
-									  					State#neuron.layer_after),
+									  					State#neuron.layer_after)),
 							lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before),
 							collector ! {bias, self(), Delta*State#neuron.bias_theta},
 							NewDeltas = lists:foldl(fun(Pid, AccumMap) -> 
@@ -134,21 +134,21 @@ update({backprop, NextPid, D}, State) ->
 	end;
 update({descend_gradient, M}, State) ->
 	Dij = lists:foldl(fun(Pid, Map) ->
-			maps:put(Pid, (1/M)*maps:get(Pid, State#neuron.deltas) + ?LAMBDA*maps:get(Pid, State#neuron.thetas), Map)
-		end,
+			            maps:put(Pid, (1/M)*maps:get(Pid, State#neuron.deltas) + ?LAMBDA * maps:get(Pid, State#neuron.thetas), Map)
+		              end,
 		maps:new(),
 		State#neuron.layer_after),
 
 	NewThetas = lists:foldl(fun(Pid, Map) -> 
 			maps:put(Pid, maps:get(Pid, State#neuron.thetas)-?ALPHA*maps:get(Pid, Dij), Map)
-		end
+		end,
 		maps:new(),
 		State#neuron.layer_after),
 
 	collector ! {getAccumulatedError, M, self()},
 
 	State#neuron{thetas = NewThetas, deltas = maps:new()};
-update({descend_bias_gradient, M, AccumBiasError}) ->
+update({descend_bias_gradient, M, AccumBiasError}, State) ->
     State#neuron{bias_theta = State#neuron.bias_theta - ?ALPHA(AccumBiasError/M)};
 update(_Msg, State) ->
     State.
