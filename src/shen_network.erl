@@ -1,7 +1,7 @@
 -module (shen_network).
 
 %% API
--export ([build/3, train/2, test/2]).
+-export ([build/3, train/4, test/2]).
 
 
 %% ===================================================================
@@ -9,7 +9,7 @@
 %% ===================================================================
 
 % starts network specified by NumAttrs and HiddenLayers parameters
-build(NumAttrs, Classes, HiddenLayerDims) ->
+build(NumAttrs, _Classes, HiddenLayerDims) ->
 	register(self(), network),
 	% start input layer
 	{ok, InputLayer} = start_layer(NumAttrs, input),
@@ -26,7 +26,7 @@ build(NumAttrs, Classes, HiddenLayerDims) ->
 	connect_layers(InputLayer, HiddenLayers, OutputLayer),
 	{InputLayer, HiddenLayers, OutputLayer}.
 
-train(0, _, _) -> collector ! stop;
+train(0, _Layers, _TrainSet, _TestSet) -> collector ! stop;
 train(NumGradientSteps, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestSet) ->
 	collector ! refresh,
 
@@ -35,20 +35,20 @@ train(NumGradientSteps, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestS
     random:seed(A, B, C),
 
 	Shuffled = shuffle_instances(TrainSet),
-	lists:map(fun train_instance/1, Shuffled),
+	lists:map(fun(Inst) -> train_instance(InputLayer, Inst) end, Shuffled),
 
 	% getting thetas and deltas from each neuron
 	lists:flatmap(fun(Pid) ->
-					gen_server:cast(Pid, {descend_gradient, length(TrainSet), Bias})
+					gen_server:cast(Pid, {descend_gradient, length(TrainSet)})
 				  end,
 				  [InputLayer] ++ HiddenLayers ++ [OutputLayer]),
 
 	test(InputLayer, TestSet),
 
-	train(NumGradientSteps-1, {InputLayer, HiddenLayers, OutputLayer}, TrainSet).
+	train(NumGradientSteps-1, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestSet).
 
 test(InputLayer, TestSet) ->
-	Error = lists:sum(lists:map(fun test_instance/1, TestSet))/length(TestSet) * 100,
+	Error = lists:sum(lists:map(fun(Inst) -> test_instance(InputLayer, Inst) end, TestSet))/length(TestSet) * 100,
 	io:format("~i%~n", [Error]),
 	ok.
 
@@ -59,7 +59,7 @@ test(InputLayer, TestSet) ->
 
 % starts LayerSize neurons and returns a list of ther Pids
 start_layer(LayerSize, Type) -> start_layer(LayerSize, Type, []).
-start_layer(0, Type, Pids) -> {ok, Pids};
+start_layer(0, _Type, Pids) -> {ok, Pids};
 start_layer(LayerSize, Type, Pids) ->
 	% start new neuron with type and access to parent and link to supervisor
 	Args = {{network_pid, self()}, {neuron_type, Type}},
@@ -78,13 +78,13 @@ start_collector() ->
 collector(BiasMap) ->
 	receive
 		{bias, Pid, X} ->
-			case find(Pid, BiasMap) of
+			case maps:find(Pid, BiasMap) of
 				{ok, V} -> collector(maps:put(Pid, V+X, BiasMap));
 				error -> collector(maps:put(Pid, X, BiasMap))
 			end;
 		{getAccumulatedError, M, Pid} ->
-			gen_server:cast(Pid, maps:get(Pid, BiasMap)),
-			collector(BiasMap)
+			gen_server:cast(Pid, maps:get(Pid, {descend_bias_gradient, M, maps:get(Pid, BiasMap)})),
+			collector(BiasMap);
 		refresh -> collector(maps:new());
 		stop -> ok
 	end.
@@ -121,16 +121,16 @@ train_instance(InputLayer, Inst) ->
 	lists:map(fun({Pid, Attr}) ->
 				gen_server:cast(Pid, {forwardprop, network, Attr})
 			  end,
-			  lists:zip(InputLayer, lists:droplast(Inst)),
+			  lists:zip(InputLayer, lists:droplast(Inst))),
 	% receive message from output layer that we are done with forward
 	receive
-		{forwardprop, OutputPid, Prediction} -> % send output layer actual class
+		{forwardprop, OutputPid, _Prediction} -> % send output layer actual class
 			OutputPid ! {backprop, network, Label}
 	end,
 	% receive messages from input layer saying netowrk is done with this instance
 	train_instance_receive_end(length(InputLayer)).
 
-train_instance_receive_end(0) -> ok.
+train_instance_receive_end(0) -> ok;
 train_instance_receive_end(N) ->
 	receive
 		{finished, NewDeltas} -> erlang:display(NewDeltas), train_instance_receive_end(N-1)
@@ -156,8 +156,8 @@ test_instance(InputLayer, Inst) ->
 	lists:map(fun({Pid, Attr}) ->
 				gen_server:cast(Pid, {forwardprop, network, Attr})
 			  end,
-			  lists:zip(InputLayer, lists:droplast(Inst)),
+			  lists:zip(InputLayer, lists:droplast(Inst))),
 	% receive message from output layer that we are done with forward
 	receive
-		{forwardprop, OutputPid, Prediction} -> Label-Prediction
-	end,
+		{forwardprop, _OutputPid, Prediction} -> Label - Prediction
+	end.

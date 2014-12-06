@@ -64,6 +64,7 @@ update({layer_before, LayerBefore}, State) ->
 update({layer_after, LayerAfter}, State) ->
 	case State#neuron.type of
 		output ->
+            BiasTheta = undefined,
 			Thetas = undefined;
 		_Else ->
             % generate truly random numbers
@@ -73,7 +74,7 @@ update({layer_after, LayerAfter}, State) ->
 			Thetas = random_init_thetas(LayerAfter)
 	end,
 	State#neuron{layer_after = LayerAfter, thetas = Thetas, bias_theta = BiasTheta};
-update({forwardprop, PrevPid, X}, State) ->
+update({forwardprop, _PrevPid, X}, State) ->
 	% collect inputs from layer before
 	NewInputs = [X | State#neuron.inputs],
 	case length(NewInputs) =:= length(State#neuron.layer_before) of
@@ -109,7 +110,7 @@ update({backprop, NextPid, D}, State) ->
 				true -> % if we have all the delta terms
 					case State#neuron.type of
 						input -> % tell network we have finished training on this instance
-							lists:map(fun(Pid) -> network ! {finished, NewDeltas} end, State#neuron.layer_before);
+							network ! {finished, NewDeltas};
 						hidden -> % compute Delta and send to previous layer
 							Delta = (State#neuron.activation*(1-State#neuron.activation))*
 									lists:sum(lists:map(fun(Pid) ->
@@ -125,7 +126,7 @@ update({backprop, NextPid, D}, State) ->
 									                    end
 					                                end,
         								            State#neuron.deltas,
-					                                LayerAfter),
+					                                State#neuron.layer_after),
 							State#neuron{deltas = NewDeltas, delta_collector = maps:new()}
 					end;
 				false -> % update deltas collected
@@ -149,16 +150,16 @@ update({descend_gradient, M}, State) ->
 
 	State#neuron{thetas = NewThetas, deltas = maps:new()};
 update({descend_bias_gradient, M, AccumBiasError}, State) ->
-    State#neuron{bias_theta = State#neuron.bias_theta - ?ALPHA(AccumBiasError/M)};
+    State#neuron{bias_theta = State#neuron.bias_theta - ?ALPHA * (AccumBiasError/M)};
 update(_Msg, State) ->
     State.
 
 % returns map of random initial theta value for each Pid in LayerBefore as a key
 random_init_thetas(Pids) ->
     lists:foldr(fun(Pid, AccumMap) ->
-                    maps:put(Pid, (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON, AccumMap)
+                    maps:put(Pid, (random:uniform()*(2.0 * ?INIT_EPSILON)) - ?INIT_EPSILON, AccumMap)
                 end,
                 maps:new(),
                 Pids).
 
-random_init_bias_theta() -> (random:uniform()*(2.0*?INIT_EPSILON))-?INIT_EPSILON.
+random_init_bias_theta() -> (random:uniform()*(2.0 * ?INIT_EPSILON)) - ?INIT_EPSILON.
