@@ -21,7 +21,9 @@ run(TrainSet, TestSet, HiddenLayerDims, NumIterations) ->
 				{ok, {NumAttrs, Classes, TestInstances}} ->
 					Layers = shen_network:build(NumAttrs, Classes, HiddenLayerDims),
 					shen_network:train(NumIterations, Layers, TrainInstances, TestInstances),
-					shen_network:test(Layers, TestInstances);
+					{InputLayer, _, _} = Layers,
+					shen_network:test(InputLayer, TestInstances),
+					shen_network:finish(Layers);
 				{error, _Reason2} ->
 					{error, invalid_test_data}
 			end

@@ -2,7 +2,7 @@
 -behaviour(supervisor).
 
 %% API
--export([start_link/0, start_child/1]).
+-export([start_link/0, start_child/1, end_child/1]).
 
 %% Supervisor Callbacks
 -export([init/1]).
@@ -19,6 +19,9 @@ start_link() ->
 start_child(Args) ->
     supervisor:start_child(?MODULE, [Args]).
 
+end_child(Pid) ->
+    supervisor:terminate_child(?MODULE, Pid).
+
 
 %% ===================================================================
 %% Supervisor Callbacks
@@ -27,11 +30,11 @@ start_child(Args) ->
 init(_Args) ->
     %%%%%%% REFINE THESE PARAMETERS %%%%%%%
     RestartStrategy = simple_one_for_one,
-    MaxRestarts = 1000,
-    MaxSecondsBetweenRestarts = 3600,
+    MaxRestarts = 1,
+    MaxSecondsBetweenRestarts = 5,
     SupFlags = {RestartStrategy, MaxRestarts, MaxSecondsBetweenRestarts},
     Restart = permanent,
-    Shutdown = brutal_kill, % 2000,
+    Shutdown = brutal_kill,
     Type = worker,
     AChild = {shen_neuron, {shen_neuron, start_link, []},
                Restart, Shutdown, Type, [shen_neuron]},
