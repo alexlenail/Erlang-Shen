@@ -1,7 +1,18 @@
+%% ===================================================================
+%% shen_network.erl
+%%
+%% Builds and maintains the relationships between layers. The API
+%% also implements train, which runs gradient descent the number
+%% of times specified by the user on the training data; test, which
+%% runs the test data on the network and outputs results; and finish
+%% which ends all child neurons and shuts down the network.
+%%
+%% ===================================================================
+
 -module (shen_network).
 
 %% API
--export ([build/3, train/4, test/5, finish/1]).
+-export ([build/3, train/4, test/6, finish/1]).
 
 
 %% ===================================================================
@@ -51,10 +62,11 @@ train(NumGradientSteps, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestS
 	shen_print:event("Gradient descent step complete, ~w to go~n", [NumGradientSteps-1]),
 	train(NumGradientSteps-1, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestSet).
 
-test(NumGradientSteps, HiddenLayerDims, InputLayer, TestFileName, TestSet) ->
+test(NumGradientSteps, HiddenLayerDims, InputLayer, TrainFileName, TestFileName, TestSet) ->
 	shen_print:title("Running test data~n", []),
 	OutFileName = gen_outfile_name(TestFileName),
 	{ok, OutFile} = file:open(OutFileName, [write]),
+	file:write(OutFile, io_lib:fwrite("Training Data: ~s~n",[TrainFileName])),
 	file:write(OutFile, io_lib:fwrite("Test Data: ~s~n",[TestFileName])),
 	file:write(OutFile, io_lib:fwrite("Hidden Layer Architecture: ~w~n",[HiddenLayerDims])),
 	file:write(OutFile, io_lib:fwrite("Gradient Descent Steps: ~w~n",[NumGradientSteps])),
@@ -128,7 +140,6 @@ connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 train_instance(InputLayer, Inst) ->
 	Label = lists:last(Inst),
 	% map across inputlayer, send 1 feature to a node
-	% erlang:display({start_forwardprop, Inst}),
 	lists:map(fun({Pid, Attr}) ->
 				gen_server:cast(Pid, {forwardprop, network, Attr})
 			  end,
@@ -136,8 +147,6 @@ train_instance(InputLayer, Inst) ->
 	% receive message from output layer that we are done with forward
 	receive
 		{forwardprop, OutputPid, _Prediction} -> % send output layer actual class
-			erlang:display({network_pred, _Prediction}),
-			% erlang:display(start_backprop),
 			gen_server:cast(OutputPid, {backprop, network, Label})
 	end,
 	train_instance_end(length(InputLayer)).
@@ -168,7 +177,6 @@ test_instance(InputLayer, Inst, OutFile) ->
 	receive
 		{forwardprop, _OutputPid, Activation} ->
 			% take raw prediction and map to 0 or 1
-			% erlang:display(Activation),
 			Prediction = 1,
 			StringifiedAttrs = lists:map(fun(Attr) ->
 											case is_float(Attr) of

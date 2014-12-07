@@ -1,3 +1,12 @@
+%% ===================================================================
+%% shen_parse.erl
+%%
+%% Parses ARFF files and returns data in a usable form. Casts strings
+%% to numeric values. ARFF files are limited to those with numeric
+%% features and binary classes.
+%%
+%% ===================================================================
+
 -module(shen_parse).
 
 %% API

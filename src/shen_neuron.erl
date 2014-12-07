@@ -1,3 +1,14 @@
+%% ===================================================================
+%% shen_neuron.erl
+%%
+%% Implements the neuron state updating functions that allow for
+%% forward propagation, back propagation, and gradient descent. This
+%% module is purposefully separate from the network for modularity.
+%% Each neuron only knows about the neurons in the layers before and
+%% after it, as well as the registered main process.
+%%
+%% ===================================================================
+
 -module(shen_neuron).
 -behaviour(gen_server).
 
@@ -35,10 +46,7 @@ init({neuron_type, Type}) ->
     {ok, InitState}.
 
 handle_cast(Msg, State) ->
-	% erlang:display("-----------------------------------------------"),
-	% erlang:display(Msg),
 	NewState = update(Msg, State),
-    % erlang:display({self(), NewState}),
     {noreply, NewState}.
 
 handle_call(_Request, _From, State) ->
@@ -59,9 +67,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% ===================================================================
 
 % sigmoid function
-g(Z) -> X = 1 / (1 + math:exp(-Z)),
-    % erlang:display({sigmoid_output, X}),
-    X.
+g(Z) -> 1 / (1 + math:exp(-Z)).
 
 % handle messages and update state record accordingly
 update({layer_before, LayerBefore}, State) ->
@@ -111,7 +117,6 @@ update({backprop, NextPid, D}, State) ->
 			NewDeltaCollector = maps:put(NextPid, D, State#neuron.delta_collector),
 			case maps:size(NewDeltaCollector) =:= length(State#neuron.layer_after) of
 				true -> % if we have all the delta terms from the next layer
-                    % erlang:display({delta_collector, self(), NewDeltaCollector}),
                     % update uppercase delta terms (accumulated delta)
                     BigDeltas = lists:foldl(fun(Pid, AccumMap) ->
                                                 Update = State#neuron.activation * maps:get(Pid, NewDeltaCollector),
@@ -122,7 +127,6 @@ update({backprop, NextPid, D}, State) ->
                                             end,
                                             State#neuron.deltas,
                                             State#neuron.layer_after),
-                    % erlang:display({big_delta, self(), BigDeltas}),
                     case State#neuron.type of
 						input -> % tell network we have finished training on this instance
 							?NETWORK ! finished_instance;
@@ -132,7 +136,6 @@ update({backprop, NextPid, D}, State) ->
 															maps:get(Pid, State#neuron.thetas) * maps:get(Pid, NewDeltaCollector)
 									  					end,
 									  					State#neuron.layer_after)),
-                            % erlang:display({delta, Delta}),
 							lists:map(fun(Pid) -> gen_server:cast(Pid, {backprop, self(), Delta}) end, State#neuron.layer_before)
 					end,
                     State#neuron{deltas = BigDeltas, delta_collector = maps:new()};
@@ -141,7 +144,6 @@ update({backprop, NextPid, D}, State) ->
 			end
 	end;
 update({descend_gradient, M}, State) ->
-    % erlang:display({descend_gradient, self(), State#neuron.type, State#neuron.deltas}),
 	Dij = lists:foldl(fun(Pid, AccumMap) ->
 			            maps:put(Pid, ((1/M) * maps:get(Pid, State#neuron.deltas)) + (?LAMBDA * maps:get(Pid, State#neuron.thetas)), AccumMap)
 		              end,
@@ -152,7 +154,6 @@ update({descend_gradient, M}, State) ->
 							end,
 							maps:new(),
 							State#neuron.layer_after),
-    % erlang:display({new_thetas, NewThetas}),
 	?NETWORK ! finished_descent,
 	State#neuron{thetas = NewThetas, deltas = maps:new()};
 update(_Msg, State) ->

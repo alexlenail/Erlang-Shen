@@ -1,3 +1,13 @@
+%% ===================================================================
+%% shen_sup.erl
+%%
+%% Serves as the supervisor for all of the spawned child processes.
+%% Implements an API that allows the application process to link the
+%% supervisor and register it, as well as safely start and manage the
+%% restart strategies for neurons.
+%%
+%% ===================================================================
+
 -module(shen_sup).
 -behaviour(supervisor).
 

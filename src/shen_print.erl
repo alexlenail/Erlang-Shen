@@ -1,3 +1,10 @@
+%% ===================================================================
+%% shen_print.erl
+%%
+%% Helper module for printing progress information for the user.
+%%
+%% ===================================================================
+
 -module(shen_print).
 
 %% API
