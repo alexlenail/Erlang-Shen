@@ -4,6 +4,7 @@
 @ATTRIBUTE sepalwidth NUMERIC
 @ATTRIBUTE petallength NUMERIC
 @ATTRIBUTE petalwidth NUMERIC
+% Iris-setosa: 0, Iris-virginica: 1
 @ATTRIBUTE class {0,1}
 
 @DATA

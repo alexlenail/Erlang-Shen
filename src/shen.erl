@@ -13,19 +13,24 @@
 %% ===================================================================
 
 run(TrainSet, TestSet, HiddenLayerDims, NumIterations) ->
+	shen_print:title("Parsing ~s~n", [TrainSet]),
 	case shen_parse:arff(TrainSet) of
 		{error, _Reason1} ->
-			{error, invalid_training_data};
+			shen_print:event("Error: Invalid training data file ~s~n", [TrainSet]);
 		{ok, {NumAttrs, Classes, TrainInstances}} ->
+			shen_print:event("Done~n", []),
+			shen_print:title("Parsing ~s~n", [TestSet]),
 			case shen_parse:arff(TestSet) of
 				{ok, {NumAttrs, Classes, TestInstances}} ->
+					shen_print:event("Done~n", []),
 					Layers = shen_network:build(NumAttrs, Classes, HiddenLayerDims),
+					shen_print:title("Training Network~n", []),
 					shen_network:train(NumIterations, Layers, TrainInstances, TestInstances),
 					{InputLayer, _, _} = Layers,
-					shen_network:test(InputLayer, TestInstances),
+					shen_network:test(NumIterations, HiddenLayerDims, InputLayer, TestSet, TestInstances),
 					shen_network:finish(Layers);
 				{error, _Reason2} ->
-					{error, invalid_test_data}
+					shen_print:event("Error: Invalid test data file ~s~n", [TestSet])
 			end
 	end.
 
@@ -35,7 +40,8 @@ run(TrainSet, TestSet, HiddenLayerDims, NumIterations) ->
 %% ===================================================================
 
 start(_StartType, _Args) ->
+	shen_print:title("Shen application starting~n", []),
 	shen_sup:start_link().
 
 stop(_State) ->
-    ok. % clean up whatever needs to be cleaned
+    ok.

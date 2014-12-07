@@ -1,7 +1,7 @@
 -module (shen_network).
 
 %% API
--export ([build/3, train/4, test/2, finish/1]).
+-export ([build/3, train/4, test/5, finish/1]).
 
 
 %% ===================================================================
@@ -10,28 +10,30 @@
 
 % starts network specified by NumAttrs and HiddenLayers parameters
 build(NumAttrs, _Classes, HiddenLayerDims) ->
+	shen_print:title("Building Network~n", []),
 	case whereis(?MODULE) of
 		undefined -> register(?MODULE, self());
 		_Pid -> ok
 	end,
 	% start input layer
+	shen_print:event("Starting input layer~n", []),
 	{ok, InputLayer} = start_layer(NumAttrs, input),
 	% start hidden layers
 	HiddenLayers = lists:map(fun(LayerSize) ->
-									erlang:display(start_layer),
+									shen_print:event("Starting hidden layer of size ~w~n", [LayerSize]),
 									{ok, LayerPids} = start_layer(LayerSize, hidden),
-									erlang:display(LayerPids),
 									LayerPids
 								end,
 								HiddenLayerDims),
 	% start output layer
+	shen_print:event("Starting output layer~n", []),
 	{ok, OutputLayer} = start_layer(1, output),
-	% start collector process for hidden bias units and gradient descent
-	% start_collector(length(InputLayer ++ lists:flatten(HiddenLayers))),
 	connect_layers(InputLayer, HiddenLayers, OutputLayer),
+	shen_print:event("Done~n", []),
 	{InputLayer, HiddenLayers, OutputLayer}.
 
-train(0, _Layers, _TrainSet, _TestSet) -> erlang:display(done_training), ok;
+train(0, _Layers, _TrainSet, _TestSet) ->
+	shen_print:event("Done~n", []);
 train(NumGradientSteps, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestSet) ->
 	% generate truly random numbers
     <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
@@ -45,28 +47,41 @@ train(NumGradientSteps, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestS
 				gen_server:cast(Pid, {descend_gradient, length(TrainSet)})
 			  end,
 			  InputLayer ++ lists:flatten(HiddenLayers)),
-
 	train_iteration_end(length(InputLayer ++ lists:flatten(HiddenLayers))),
-	
-	test(InputLayer, TestSet), % remove this when done
-
+	shen_print:event("Gradient descent step complete, ~w to go~n", [NumGradientSteps-1]),
 	train(NumGradientSteps-1, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestSet).
 
-test(InputLayer, TestSet) ->
-	% Error = lists:sum(lists:map(fun(Inst) -> test_instance(InputLayer, Inst) end, TestSet))/length(TestSet) * 100,
-	% io:format("~i%~n", [Error]),
-	E = lists:map(fun(Inst) -> test_instance(InputLayer, Inst) end, TestSet),
-	erlang:display(E),
-	ok.
+test(NumGradientSteps, HiddenLayerDims, InputLayer, TestFileName, TestSet) ->
+	shen_print:title("Running test data~n", []),
+	OutFileName = gen_outfile_name(TestFileName),
+	{ok, OutFile} = file:open(OutFileName, [write]),
+	file:write(OutFile, io_lib:fwrite("Test Data: ~s~n",[TestFileName])),
+	file:write(OutFile, io_lib:fwrite("Hidden Layer Architecture: ~w~n",[HiddenLayerDims])),
+	file:write(OutFile, io_lib:fwrite("Gradient Descent Steps: ~w~n",[NumGradientSteps])),
+	file:write(OutFile, io_lib:fwrite("~nInstances and Predictions~n",[])),
+	TestResults = lists:map(fun(Inst) -> test_instance(InputLayer, Inst, OutFile) end, TestSet),
+	file:close(OutFile),
+	NumCorrect = lists:foldl(fun({L, P}, A) ->
+								case L =:= P of
+									true -> A + 1;
+									false -> A
+								end
+							end,
+							0,
+							TestResults),
+	shen_print:event("Results output to ~s~n", [OutFileName]),
+	shen_print:event("Accuracy: ~w%~n", [100 * (NumCorrect / length(TestSet))]).
 
 finish({InputLayer, HiddenLayers, OutputLayer}) ->
+	shen_print:title("Shutting down network~n", []),
+	shen_print:event("Ending neuron processes~n", []),
 	% end all neuron processes
 	lists:map(fun(Pid) ->
 				shen_sup:end_child(Pid)
 			  end,
 			  InputLayer ++ lists:flatten(HiddenLayers) ++ OutputLayer),
 	unregister(?MODULE),
-	ok.
+	shen_print:event("Done~n", []).
 
 
 %% ===================================================================
@@ -84,7 +99,10 @@ start_layer(LayerSize, Type, Pids) ->
 			start_layer(LayerSize-1, Type, [ChildPid | Pids])
 	end.
 
+% sends neurons in each layer the Pids of the layer before and layer after
+% input layer gets network as its layer before, output layer gets network as its layer after
 connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
+	shen_print:event("Connecting layers~n", []),
 	% connect layers forward
 	lists:foldl(fun(Layer, LayerBefore) ->
 					lists:map(fun(NeuronPid) ->
@@ -110,7 +128,7 @@ connect_layers(InputLayer, HiddenLayers, OutputLayer) ->
 train_instance(InputLayer, Inst) ->
 	Label = lists:last(Inst),
 	% map across inputlayer, send 1 feature to a node
-	erlang:display({start_forwardprop, Inst}),
+	% erlang:display({start_forwardprop, Inst}),
 	lists:map(fun({Pid, Attr}) ->
 				gen_server:cast(Pid, {forwardprop, network, Attr})
 			  end,
@@ -119,7 +137,7 @@ train_instance(InputLayer, Inst) ->
 	receive
 		{forwardprop, OutputPid, _Prediction} -> % send output layer actual class
 			erlang:display({network_pred, _Prediction}),
-			erlang:display(start_backprop),
+			% erlang:display(start_backprop),
 			gen_server:cast(OutputPid, {backprop, network, Label})
 	end,
 	train_instance_end(length(InputLayer)).
@@ -138,17 +156,42 @@ train_iteration_end(NumNeurons) ->
 		finished_descent -> train_iteration_end(NumNeurons - 1)
 	end.
 
-test_instance(InputLayer, Inst) ->
+test_instance(InputLayer, Inst, OutFile) ->
 	Label = lists:last(Inst),
+	Attributes = lists:droplast(Inst),
 	% map across inputlayer, send 1 feature to a node
 	lists:map(fun({Pid, Attr}) ->
 				gen_server:cast(Pid, {forwardprop, network, Attr})
 			  end,
-			  lists:zip(InputLayer, lists:droplast(Inst))),
+			  lists:zip(InputLayer, Attributes)),
 	% receive message from output layer that we are done with forward
 	receive
-		{forwardprop, _OutputPid, Prediction} -> Label - Prediction
+		{forwardprop, _OutputPid, Activation} ->
+			% take raw prediction and map to 0 or 1
+			% erlang:display(Activation),
+			Prediction = 1,
+			StringifiedAttrs = lists:map(fun(Attr) ->
+											case is_float(Attr) of
+												true -> float_to_list(Attr, [{decimals, 10}, compact]);
+												false -> integer_to_list(Attr)
+											end
+										end,
+										Attributes),
+			OutLine = string:join(StringifiedAttrs ++ [integer_to_list(Label)] ++ [integer_to_list(Prediction)], ","),
+			% output instance+prediction to outfile
+			file:write(OutFile, io_lib:fwrite("~s~n",[OutLine])),
+			{Label, Prediction}
 	end.
+
+gen_outfile_name(TestFileName) ->
+	% get timestamp of now
+	{{Year, Month, Day}, {Hour, Minute, Second}} = erlang:localtime(),
+	TimeStampString = integer_to_list(Year) ++ "-" ++ integer_to_list(Month) ++ "-" ++
+					  integer_to_list(Day) ++ "-" ++ integer_to_list(Hour) ++ ":" ++
+					  integer_to_list(Minute) ++ ":" ++ integer_to_list(Second),
+	% strip directories before file name and .arff
+	StrippedTestFileName = re:replace(lists:last(string:tokens(TestFileName, "/")), ".arff", "", [global, {return, list}]),
+	"results/shen_results_" ++ StrippedTestFileName ++ "_" ++ TimeStampString ++ ".txt".
 
 % shuffle list of data instances in random order
 shuffle_instances([]) -> [];

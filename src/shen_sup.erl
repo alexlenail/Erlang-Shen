@@ -9,6 +9,7 @@
 
 -define(SERVER, ?MODULE).
 
+
 %% ===================================================================
 %% API Functions
 %% ===================================================================
@@ -28,7 +29,6 @@ end_child(Pid) ->
 %% ===================================================================
 
 init(_Args) ->
-    %%%%%%% REFINE THESE PARAMETERS %%%%%%%
     RestartStrategy = simple_one_for_one,
     MaxRestarts = 1,
     MaxSecondsBetweenRestarts = 5,
