@@ -177,7 +177,10 @@ test_instance(InputLayer, Inst, OutFile) ->
 	receive
 		{forwardprop, _OutputPid, Activation} ->
 			% take raw prediction and map to 0 or 1
-			Prediction = 1,
+			case Activation >= 0.55 of
+				true -> Prediction = 1;
+				false -> Prediction = 0
+			end,
 			StringifiedAttrs = lists:map(fun(Attr) ->
 											case is_float(Attr) of
 												true -> float_to_list(Attr, [{decimals, 10}, compact]);

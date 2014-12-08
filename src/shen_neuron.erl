@@ -22,7 +22,7 @@
 -define(NETWORK, shen_network). % registered network process
 -define(INIT_EPSILON, 0.0001).
 -define(LAMBDA, 0.0005).
--define(ALPHA, 0.5). % learning rate
+-define(ALPHA, 0.1). % learning rate
 
 
 %% ===================================================================
@@ -166,6 +166,7 @@ random_init_thetas(Pids) ->
     random:seed(A, B, C),
     lists:foldr(fun(Pid, AccumMap) ->
                     maps:put(Pid, (random:uniform() * (2.0 * ?INIT_EPSILON)) - ?INIT_EPSILON, AccumMap)
+                    % maps:put(Pid, 0, AccumMap)
                 end,
                 maps:new(),
                 Pids).
