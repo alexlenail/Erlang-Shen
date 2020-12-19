@@ -12,13 +12,9 @@ Erlang-Shen is a naive concurrent implementation of the neural network learning 
 #### Build:
         make clean && make
 
-#### Start Erlang/OTP:
-        erl -pa ebin
+#### Test:
+        make shell-dev
 
-#### Start and run application:
-        application:start(shen).
-        shen:run(TrainingDataFile, TestDataFile, HiddenLayerDimensions, GradientDescentSteps).
+        > shen:run(TrainingDataFile, TestDataFile, HiddenLayerDimensions, GradientDescentSteps).
+
 Where `TrainingDataFile` and `TestDataFile` are strings representing paths to valid ARFF format data files. Example files can be found in the `datasets` folder of this repository. `HiddenLayerDimensions` is a list of integers that can be specified as the hidden layer architecture of the neural network. `GradientDescentSteps` is an integer specifiying the number of gradient descent steps to take to tune the network. Results are displayed and output to the `results` folder in this repository. For best results on the Iris dataset, it is recommended that you use a single hidden layer of size 4 (the number of features in the dataset) and at least 400 gradient descent steps. We have found with these parameters, we can get 94% accuracy on the Iris dataset.
-
-#### Stop application:
-        application:stop(shen).

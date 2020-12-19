@@ -16,11 +16,11 @@
 %% ===================================================================
 
 title(Text, Format) ->
-    io:format("========================================~n"),
-    io:format(Text, Format),
-    io:format("========================================~n"),
+    lager:info("========================================~n"),
+    lager:info(Text, Format),
+    lager:info("========================================~n"),
     ok.
 
 event(Text, Format) ->
-    io:format(Text, Format),
+    lager:info(Text, Format),
     ok.

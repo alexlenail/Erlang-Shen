@@ -162,10 +162,10 @@ update(_Msg, State) ->
 % returns map of random initial theta value for each Pid in LayerBefore as a key
 random_init_thetas(Pids) ->
 	% generate truly random numbers
-    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
-    random:seed(A, B, C),
+	<<A:32, B:32, C:32>> = crypto:strong_rand_bytes(12),
+    rand:seed(exsplus, {A, B, C}),
     lists:foldr(fun(Pid, AccumMap) ->
-                    maps:put(Pid, (random:uniform() * (2.0 * ?INIT_EPSILON)) - ?INIT_EPSILON, AccumMap)
+                    maps:put(Pid, (rand:uniform() * (2.0 * ?INIT_EPSILON)) - ?INIT_EPSILON, AccumMap)
                     % maps:put(Pid, 0, AccumMap)
                 end,
                 maps:new(),

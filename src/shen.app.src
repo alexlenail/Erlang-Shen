@@ -1,6 +1,6 @@
 {application, shen,
  [
-  {description, ""},
+  {description, "a naive concurrent implementation of the neural network learning algorithm in Erlang by Alex Lenail and Sunjay Bhatia"},
   {vsn, "1.0.0"},
   {registered, []},
   {applications, [kernel, stdlib]},

@@ -47,8 +47,9 @@ train(0, _Layers, _TrainSet, _TestSet) ->
 	shen_print:event("Done~n", []);
 train(NumGradientSteps, {InputLayer, HiddenLayers, OutputLayer}, TrainSet, TestSet) ->
 	% generate truly random numbers
-    <<A:32, B:32, C:32>> = crypto:rand_bytes(12),
-    random:seed(A, B, C),
+	Rand = crypto:strong_rand_bytes(12),
+	<<A:32, B:32, C:32>> = Rand,
+    rand:seed(exsplus, {A, B, C}),
 	Shuffled = shuffle_instances(TrainSet),
 	% train on each instance in random order
 	lists:map(fun(Inst) -> train_instance(InputLayer, Inst) end, Shuffled),
@@ -210,7 +211,7 @@ shuffle_instances([X]) -> [X];
 shuffle_instances(Xs) -> shuffle_instances(Xs, length(Xs), []).
 shuffle_instances([], 0, Shuffled) -> Shuffled;
 shuffle_instances(Xs, Len, Shuffled) ->
-    {X, Rest} = nth_rest(random:uniform(Len), Xs),
+    {X, Rest} = nth_rest(rand:uniform(Len), Xs),
     shuffle_instances(Rest, Len - 1, [X | Shuffled]).
 
 % pick a random element from list and return it and rest
