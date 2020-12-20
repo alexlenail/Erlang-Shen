@@ -191,7 +191,10 @@ test_instance(InputLayer, Inst, OutFile) ->
 										Attributes),
 			OutLine = string:join(StringifiedAttrs ++ [integer_to_list(Label)] ++ [integer_to_list(Prediction)], ","),
 			% output instance+prediction to outfile
-			file:write(OutFile, io_lib:fwrite("~s~n",[OutLine])),
+			case OutFile =:= [] of
+				true -> ignore;
+				false -> file:write(OutFile, io_lib:fwrite("~s~n",[OutLine]))
+			end,
 			{Label, Prediction}
 	end.
 
