@@ -12,7 +12,7 @@
 -module (shen_network).
 
 %% API
--export ([build/3, train/4, test/6, finish/1]).
+-export ([build/3, train/4, test/6, finish/1, test_instance/3]).
 
 
 %% ===================================================================
