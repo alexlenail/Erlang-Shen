@@ -1,1 +1,4 @@
 .rebar/
+_build
+priv/log
+temprelease
